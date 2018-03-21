@@ -1037,8 +1037,6 @@ near=> k; first near=> x.
 - by end_near; exists (k1 * k2).
 Qed.
 
-(* NB: also enjoyed by bigOmega *)
-
 End rule_of_products_in_R.
 
 Section Shift.
@@ -1199,8 +1197,8 @@ Structure bigOmega_type {W : normedModType K} (F : set (set T)) (g : T -> W) := 
   _ : `[< bigOmega F bigOmega_fun g >]
 }.
 
-Notation "{Omega_ F f }" := (@bigOmega_type _ F f)
-  (at level 0, F at level 0, format "{Omega_  F  f }").
+Notation "{Omega_ F g }" := (@bigOmega_type _ F g)
+  (at level 0, F at level 0, format "{Omega_  F  g }").
 
 Canonical bigOmega_subtype {W : normedModType K} (F : set (set T)) (g : T -> W) :=
   [subType for (@bigOmega_fun W F g)].
@@ -1220,10 +1218,10 @@ Notation "[bigOmega 'of' f ]" := (@bigOmega_clone _ _ _ f _ _ idfun)
 Lemma bigOmega_self_subproof F g : Filter F -> bigOmega F g g.
 Proof. move=> FF; exists 1 => //; near=> x; by [rewrite mul1r|end_near]. Qed.
 
-Canonical bigOmega_self (F : filter_on T) g := BigOmega (asboolT (@bigOmega_self_subproof F g _)).
+Definition bigOmega_self (F : filter_on T) g := BigOmega (asboolT (@bigOmega_self_subproof F g _)).
 
 Definition the_bigOmega (u : unit) (F : filter_on T)
-  (phF : phantom (set (set T)) F) f h := bigOmega_fun (insubd (bigOmega_self F h) f).
+  (phF : phantom (set (set T)) F) f g := bigOmega_fun (insubd (bigOmega_self F g) f).
 Arguments the_bigOmega : simpl never, clear implicits.
 
 Notation mkbigOmega tag x := (the_bigOmega tag _ (PhantomF x)).
@@ -1276,6 +1274,9 @@ Proof. rewrite !eqOmegaOE !eqOmegaO => fg gh; exact: (eqO_trans gh fg). Qed.
 
 End big_omega.
 
+Notation "{Omega_ F f }" := (@bigOmega_type _ _ _ _ F f)
+  (at level 0, F at level 0, format "{Omega_ F  f }").
+
 Notation mkbigOmega tag x := (the_bigOmega tag (PhantomF x)).
 (* Parsing *)
 Notation "[Omega_ x e 'of' f ]" := (mkbigOmega gen_tag x f e).
@@ -1284,6 +1285,8 @@ Notation "[Omega '_' x e 'of' f ]" := (the_bigOmega _ _ (PhantomF x) f e).
 Notation "`Omega_ F g" := (is_bigOmega F g)
   (at level 0, F at level 0, format "`Omega_ F g").
 Notation "f '=Omega_' F h" := (f%function = mkbigOmega the_tag F f h).
+Notation "[bigOmega 'of' f ]" := (@bigOmega_clone _ _ _ _ _ _ f _ _ idfun)
+  (at level 0, f at level 0, format "[bigOmega  'of'  f ]").
 
 Section big_omega_in_R.
 
@@ -1302,11 +1305,28 @@ apply/eqOP; exists k => //; near=> x.
 end_near.
 Qed.
 
-Lemma mulbigOmega (F : filter_on pT) (h1 h2 f g : pT -> R^o) :
+Lemma mulOmega (F : filter_on pT) (h1 h2 f g : pT -> R^o) :
   [Omega_F h1 of f] * [Omega_F h2 of g] =Omega_F (h1 * h2).
 Proof.
-(* TODO *)
-Abort.
+rewrite eqOmegaOE eqOmegaO [in RHS]bigOE // -bigOFE.
+set W1 := [Omega_F _ of _]; set W2 := [Omega_F _ of _].
+have [k1 ? ?] := bigOmegaP [bigOmega of W1].
+have [k2 ? ?] := bigOmegaP [bigOmega of W2].
+near=> k; first near=> x.
+  rewrite (ler_trans (absrM _ _)) //.
+  rewrite (@ler_trans _ ((k2 * k1)^-1 * `|[(W1 * W2) x]|)) //.
+    rewrite invrM ?unitfE ?gtr_eqF // -mulrA ler_pdivl_mull //.
+    rewrite ler_pdivl_mull // (mulrA k1) mulrCA [`|[_]|]normrM.
+    rewrite ler_pmul //.
+    by rewrite mulr_ge0 // ltrW.
+    by rewrite mulr_ge0 // ltrW.
+    near: x.
+    near: x.
+  rewrite ler_wpmul2r // ltrW //; near: k.
+  end_near.
+end_near.
+by exists (k2 * k1)^-1.
+Qed.
 
 End big_omega_in_R.
 
