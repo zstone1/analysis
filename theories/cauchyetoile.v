@@ -76,13 +76,20 @@ Proof.
   by split ; last by rewrite addr0.  
 Qed.
 
+ 
 
 Lemma real_complex_inv : forall x : R, x%:C^-1 = (x^-1)%:C.  
 Proof. Admitted. 
 
+Lemma Im_inv : ('i%C)^-1 = (-1*i) :> C.
+Proof. Admitted.  
 
-Check real_complex_additive.
+Lemma invcM : forall x y : C, (x*y)^-1 = x^-1 * y^-1. (*Maybe another lemma is doing that, or invrM *)
+Proof. Admitted.
 
+Lemma Im_mul : forall x : R, (x*i) = (x%:C * 'i%C). 
+Proof. by move => x ; simpc. Qed. 
+  
 Lemma normcD : forall ( x y : C), normc (x+y) <= (normc x + normc y).
 Proof.
   by move => x y ; rewrite -lecR realtocomplex_additive ; apply :lec_normD .
@@ -98,14 +105,15 @@ Qed.
 Lemma scalecr : forall w : C^o, forall r : R, (r *: w = r%:C *: w). 
 Proof. by move => [a b ] r ; rewrite  eqE_complex //= ; split ;  simpc. Qed.
 
-Check complex_real.
+About AbsRing_ball.
+
  
 Section C_Rnormed.
  
  (* Uniform.mixin_of takes a locally but does not expect a TopologicalType, which is inserted in the Uniform.class_of *)
  (* Whereas NormedModule.mixin_of asks for a Uniform.mixin_of loc *)
 
-(*Context (K : absRingType). Nor working with any K, how to close the real scope ? Do it before ?  *)
+(*Context (K : absRingType). Nor working with any K, how to close the real scope ? Do it before ?  *) 
 
  
 Program Definition uniformmixin_of_normaxioms (V : lmodType R) (norm : V -> R)
@@ -248,6 +256,15 @@ Section C_absRing.
   Proof.  by []. Qed.
 
 
+  Lemma absring_real_complex : forall r: R, forall x : R, AbsRing_ball 0 r x -> (@AbsRing_ball C_absRingType 0%:C r x%:C).
+  Proof.
+    move => r x ballrx.   
+    rewrite /AbsRing_ball /ball_ absCE.
+    rewrite addrC addr0 -scaleN1r normcZ normrN1 mul1r normc_r. 
+    move : ballrx ; rewrite /AbsRing_ball /ball_ absRE.
+    by rewrite addrC addr0 normrN. 
+  Qed.
+
 End C_absRing.
 
 Section Holomorphe.
@@ -266,9 +283,6 @@ differentiable_def (K : absRingType) (V W : normedModType K) (f : V -> W)
 (*Important : differentiable in derive.v, means continuoulsy differentiable, not just that the limit exists. *)
 (*derivable concerns only the existence of the derivative *)
 
-About derivable.
-
-Print locally'.
 Definition holomorphic (f : Co_normedType -> Co_normedType) c := forall v,
 cvg ((fun h => h^-1 *: ((f \o shift c) (h *: v) - f c)) @ locally' (0 : Co_normedType)).
 
@@ -281,11 +295,24 @@ Definition complex_Rnormed_absring : C_RnormedType -> C^o := id. (* Coercion ? *
 
 (* Check ('D_x h 0). (*This has a weird type *) *)
  
-Definition CauchyRiemanEq (f : C_RnormedType -> C_RnormedType)  :=
-  let u := (fun c => Re ( f c)): C_RnormedType -> R^o  in
+Definition CauchyRiemanEq_R2 (f : C_RnormedType -> C_RnormedType)  :=
+  let u := (fun c => Re ( f c)): C_RnormedType -> R^o  in 
   let v:= (fun c => Im (f c)) :  C_RnormedType -> R^o in
-  ('D_(1%:C) u = 'D_('i) v) /\ ('D_('i) u = 'D_(1%:C) v).
+  (* ('D_(1%:C) u = 'D_('i) v) /\ ('D_('i) u = 'D_(1%:C) v). *)
+  forall x, (((derive u x (1%:C)) = 
+         (derive v x ('i))) /\ ((derive v x (1%:C)) = -(derive u x ('i)))).
+Check derive. (*derive is explicitely for R normed spaces *)
 
+
+Definition deriveC (V W : normedModType C)(f : V -> W) c v :=
+  lim ((fun h => h^-1 *: ((f \o shift c) (h *: v) - f c)) @ locally' (0 : C^o)).
+
+
+Definition CauchyRiemanEq (f : C -> C) :=
+ forall z, 'i * lim ((fun h : R => h^-1 *: ((f \o shift z) (h *: 1%:C) - f z)) @ locally' (0 : R^o)) =
+      lim ((fun h : R => h^-1 *: ((f \o shift z) (h *: 'i%C) - f z)) @ locally' (0 : R^o)).
+
+  
 Lemma eqCr (R : rcfType) (r s : R) : (r%:C == s%:C) = (r == s).
 Proof. exact: (inj_eq (@complexI _)). Qed.
 
@@ -296,37 +323,76 @@ Proof. exact: (inj_eq (@complexI _)). Qed.
  *)
 
 Theorem CauchyRiemann (f : C^o -> C^o) c:  (holomorphic f c)
-          <-> (forall v, derivable (complex_realfun f) c v) /\(CauchyRiemanEq f). 
+          <-> (forall v : C, derivable (complex_realfun f) c v) /\ (CauchyRiemanEq f). 
 Proof.
-split.
-- move => H ; split => v. 
-  rewrite /derivable.
+split. 
+- move => H ; split (* => v*). 
+  (* case/cvg_ex: (H v) => l H0. apply: (cvgP (l := l)). *)
+  rewrite /derivable => v. 
   move : (H v) => /cvg_ex [l H0] {H}. (* eapply*)
   apply : (cvgP (l := l)).
-- have eqnear0 : {near (@locally' R_topologicalType  0),
+  - have eqnear0 : {near (@locally' R_topologicalType  0),
      (fun h : C_absRingType => h^-1 *: ((f \o shift c) (h *: (complex_Rnormed_absring v)) - f c))
        \o (real_complex R) =1
      (fun h0 : R_absRingType => h0^-1 *: ((complex_realfun f \o shift c) (h0 *: v )
      - complex_realfun f c)) }.
     exists 1 ; first by [] ;  move => h _ neq0h //=; rewrite real_complex_inv -scalecr.    
     by apply : (scalerI (neq0h)) ; rewrite !scalerA //= (divff neq0h) !scale1r //= -scalecr. 
-  pose subsetfilters:= (flim_eq_loc eqnear0).
+  pose subsetfilters:= (flim_eq_loc eqnear0). 
   apply :  (@flim_trans _ ( (fun h : C_absRingType => h^-1 *: ((f \o shift c) (h *: (complex_Rnormed_absring v)) - f c)) \o (real_complex R) @ (@locally' R_topologicalType  0))).
   exact : (subsetfilters (@locally'_filter R_topologicalType  0)).
 - unshelve apply : flim_comp.
   exact (locally' 0%:C).
-- move => //= A  [r [H1 H2]] ; exists r ; first by [].
-  move => b ballrb neqb0.  
-  have H4 : (AbsRing_ball 0%:C r b%:C). rewrite /AbsRing_ball /ball_ absCE.
-   rewrite addrC addr0 -scaleN1r normcZ normrN1 mul1r normc_r. 
-   move : ballrb ; rewrite /AbsRing_ball /ball_ absRE.
-   by rewrite addrC addr0 normrN. 
-  have H5 : (b%:C != 0%:C) by move : neqb0 ; apply : contra ; rewrite eqCr.
-  by apply : (H2 b%:C H4 H5).
+- move => //= A  [r [leq0r ballrA]] ; exists r ; first by []. 
+  move => b ballrb neqb0.   
+  have ballCrb : (AbsRing_ball 0%:C r b%:C).
+   by apply : absring_real_complex.
+  have bneq0C : (b%:C != 0%:C) by move : neqb0 ; apply : contra ; rewrite eqCr.
+  by apply : (ballrA b%:C ballCrb bneq0C).
 by [].
-- split.   
- -  
- -  admit.   
+- move => x .
+   pose quotC := (fun h : C_absRingType => h^-1 *: ((f \o shift x) (h * 1%:C) - f x)).
+   pose quotR := (fun h : R_absRingType => h^-1 *: ((f \o shift x) (h *: 1%:C ) - f x)).
+   (* move : ( H 1%:C) => /cvg_ex [l H0].*) (*do we need f to be holo to perform the calculi ? *)
+   have eqnear0x : {near (@locally' R_topologicalType 0), quotC \o ( fun h => h *: 1%:C)  =1 quotR }.
+      by  exists 1 ; first by [] ; move => h  _ _ //= ;  simpc ; rewrite /quotC /quotR real_complex_inv -scalecr ; simpc. 
+   pose subsetfiltersx := (flim_eq_loc eqnear0x).
+   pose l := deriveC f x 1.
+   (*lim ((fun h : C_absRingType => h^-1 *: ((f \o shift x) (h * 1%:C) - f x)) @ (@locally' C_topologicalType 0) ). *)
+   have -> : lim (quotR @ (@locally' R_topologicalType 0)) = lim (quotC @ (@locally' C_topologicalType 0) ).
+     apply:  (@flim_map_lim _ _ _ (@locally' R_topologicalType 0) _ _ (lim (quotC @ (@locally' C_topologicalType 0) ))).
+     (* apply flim_trans *)
+      (*move => A.         
+       - exact : (subsetfiltersx (@locally'_filter R_topologicalType  0)). 
+       - set f1 := (X in X \o _).
+         set f2 := (X in _ \o X).
+         set F := (X in _ `=>` X).    
+
+         About lim.
+
+       Search _ flim (_ =1 _).
+       Locate  "_ `=>` _".
+       -  move => A [r leqr0] H1 //=.  
+         exists r. by [].
+         move => z [ballrz neqz0] //= ; simpc. 
+         have zneq0C : (z%:C != 0%:C) by move : neqz0 ; apply : contra ; rewrite eqCr.
+     apply : (H1 ((z +i* 0)^-1 *: (f (z +i* 0 + x) - f x))).  
+     rewrite /AbsRing_ball /ball_ absCE //=.*) 
+     admit.
+  have eqnear0y : {near (@locally' R_topologicalType 0), ((fun (h : R) => h^-1 *: ((-'i) * ((f \o shift x) (h *: 'i%C) - f x)))) =1
+                  quotC  \o ( fun h => h *: 'i%C)  }.
+    exists 1 ; first by [] ; move => h _ _ //= ;  simpc ; rewrite /quotC (Im_mul h) invcM. 
+    by rewrite -scalerA real_complex_inv  Im_inv scalecr; simpc. 
+  
+   pose subsetfiltersy := (flim_eq_loc eqnear0y).
+  have -> : lim ((fun h : R_absRingType => h^-1 *: ((f \o shift x) (h *: 'i%C) - f x)) @ (@locally' R_topologicalType 0)) = ('i%C) * l. 
+     admit.
+  by [].
+- move => [D0 CR] v.
+  move : (D0 v) => /cvg_ex [l D] {D}.  
+  exists 1. 
+
+
 Admitted.
 
 
