@@ -657,6 +657,13 @@ rewrite -(@pmulr_rge0 _ 2) // mulr2n mulrDl !mul1r.
 by rewrite -{2}normmN (ler_trans _ (ler_normm_add _ _)) // subrr normm0.
 Qed.
 
+Lemma ler_norm_big T (s : seq T) (f : T -> V) :
+  `|[\big[+%R/0]_(i <- s) f i]| <= \big[+%R/0]_(i <- s) `|[f i]|.
+Proof.
+elim: s => *; [rewrite big_nil normm0; apply sumr_ge0 => *; exact: normm_ge0 |
+by rewrite 2!big_cons (ler_trans (ler_normm_add _ _)) // ler_add2l].
+Qed.
+
 Lemma normm_gt0 x : (0 < `|[x]|) = (x != 0).
 Proof. by rewrite ltr_def normm_eq0 normm_ge0 andbT. Qed.
 
