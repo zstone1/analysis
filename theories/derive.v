@@ -41,7 +41,7 @@ Reserved Notation "f ^` ( n )" (at level 8, format "f ^` ( n )").
 
 Section Differential.
 
-Context {K : realType} {V W : normedModType K}.
+Context {K : numDomainType} {V W : normedModType K}.
 Definition diff (F : filter_on V) (_ : phantom (set (set V)) F) (f : V -> W) :=
   (get (fun (df : {linear V -> W}) => continuous df /\ forall x,
       f x = f (lim F) + df (x - lim F) +o_(x \near F) (x - lim F))).

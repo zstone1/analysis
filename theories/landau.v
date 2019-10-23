@@ -291,7 +291,7 @@ Lemma showo : (gen_tag = tt) * (the_tag = tt) * (a_tag = tt). Proof. by []. Qed.
 (* Tentative to handle small o and big O notations *)
 Section Domination.
 
-Context {K : realFieldType(*absRingType*)} {T : Type} {V W : normedModType K}.
+Context {K : numFieldType(*absRingType*)} {T : Type} {V W : normedModType K}.
 
 Let littleo_def (F : set (set T)) (f : T -> V) (g : T -> W) :=
   forall eps, 0 < eps -> \forall x \near F, `|f x| <= eps * `|g x|.
@@ -831,7 +831,7 @@ Hint Resolve littleo_eqO : core.
 Arguments bigO {_ _ _ _}.
 
 (* NB: see also scaleox *)
-Lemma scaleolx (K : realFieldType) (V W : normedModType K) {T : Type}
+Lemma scaleolx (K : numFieldType) (V W : normedModType K) {T : Type}
   (F : filter_on T) (a : W) (k : T -> K^o) (e : T -> V) (x : T) :
   ([o_F e of k] x) *: a = [o_F e of (fun y => [o_F e of k] y *: a)] x.
 Proof.
@@ -949,7 +949,7 @@ Arguments bigO_bigO_eqO {K T V W X F}.
 
 Section littleo_bigO_transitivity.
 
-Context {K : realFieldType} {T : Type} {V W Z : normedModType K}.
+Context {K : numFieldType} {T : Type} {V W Z : normedModType K}.
 
 Lemma eqaddo_trans (F : filter_on T) (f g h : T -> V) fg gh (e : T -> W):
   f = g + [o_ F e of fg] -> g = h + [o_F e of gh] -> f = h +o_F e.
@@ -987,7 +987,7 @@ End littleo_bigO_transitivity.
 
 Section rule_of_products_in_R.
 
-Variables (R : realType) (pT : pointedType).
+Variables (R : numDomainType) (pT : pointedType).
 
 Lemma mulo (F : filter_on pT) (h1 h2 f g : pT -> R^o) :
   [o_F h1 of f] * [o_F h2 of g] =o_F (h1 * h2).
