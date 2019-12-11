@@ -242,11 +242,12 @@ Definition C_RLalg := LalgType R Rcomplex scalecAl.
 
 End C_Rnormed.
 
-Section cauchyetoile.
+Section Holomorphe.
 Variable R : rcfType.
 
 Local Notation sqrtr := Num.sqrt.
 Local Notation C := R[i].
+Local Notation RComplex := (Rcomplex R).
 Local Notation Re := (@complex.Re R).
 Local Notation Im := (@complex.Im R).
 
@@ -301,9 +302,6 @@ Lemma limin_scaler (K : numFieldType) (V : normedModType K) (T : topologicalType
   cvg(f @ F) -> k *: lim (f @ F) = lim ((k \*: f) @ F ).
 Proof. by move => cv; apply/esym/flim_lim; apply: lim_scaler. Qed.
 
-Section Holomorphe.
-
-Print differentiable_def.
 (* used in derive.v, what does center means*)
 (*CoInductive
 differentiable_def (K : absRingType) (V W : normedModType K) (f : V -> W)
@@ -321,20 +319,16 @@ not just that the limit exists. *)
 Definition holomorphic (f : C^o -> C^o) (c : C^o) :=
   cvg ((fun (h : C^o) => h^-1 *: ((f \o shift c) h - f c)) @ (locally' (0:C^o))).
 
-Definition complex_realfun (f : C^o -> C^o) : Rcomplex_normedModType R -> Rcomplex_normedModType R := f.
+Definition complex_realfun (f : C^o -> C^o) : RComplex -> RComplex := f.
 Arguments complex_realfun _ _ /.
 
-(* NB: not used *)
-Definition complex_Rnormed_absring : Rcomplex_normedModType R -> C^o := id.
-
-Definition CauchyRiemanEq_R2 (f : Rcomplex_normedModType R -> Rcomplex_normedModType R) c :=
-  let u := (fun c => Re (f c)) : Rcomplex_normedModType R -> R^o  in
-  let v:= (fun c => Im (f c)) : Rcomplex_normedModType R -> R^o in
+Definition CauchyRiemanEq_R2 (f : RComplex -> RComplex) c :=
+  let u := (fun c => Re (f c)) : RComplex -> R^o  in
+  let v:= (fun c => Im (f c)) : RComplex -> R^o in
   'D_1%:C u c = 'D_'i v c /\ 'D_1%:C v c = - 'D_'i u c.
 
 (* NB: not used *)
-Definition deriveC (V W : normedModType C) (f : V -> W) c v :=
-  lim ((fun (h : C^o) => h^-1 *: ((f \o shift c) (h *: v) - f c)) @ locally' 0).
++Definition Cderivable (V W : normedModType C) (f : V -> W) := derivable f.
 
 Definition CauchyRiemanEq (f : C -> C) z :=
   'i * lim ((fun h : R => h^-1 *: ((f \o shift z) (h *: 1%:C) - f z)) @ (locally' (0:R^o))) =
@@ -351,25 +345,26 @@ Definition Rderivable (V W : normedModType R) (f : V -> W) := derivable f.
 
 (*The topological structure on R is given by R^o *)
 Lemma holo_derivable (f : (C)^o -> (C)^o) c :
-  holomorphic f c -> (forall v : C, Rderivable ( complex_realfun f) c v).
+  holomorphic f c -> (forall v : C, Rderivable (complex_realfun f) c v).
 Proof.
 move=> /cvg_ex [l H]; rewrite /Rderivable /derivable => v /=.
 rewrite /type_of_filter /= in l H.
-set ff : Rcomplex_normedModType R -> Rcomplex_normedModType R := f.
+set ff : RComplex -> RComplex := f.
 set quotR := (X in (X @ _)).
 pose mulv (h : R) := (h *: v).
 pose quotC (h : C) : C^o := h^-1 *: ((f \o shift c) h - f c).
-(* here f : C -> C does not work - as if we needed C^o still for the normed structure*)
 case: (EM (v = 0)) => [eqv0|/eqP vneq0].
-- apply (cvgP (l := (0:Rcomplex R))).
+- apply (cvgP (l := (0:RComplex))).
   have eqnear0 : {near locally' (0:R^o), 0 =1 quotR}.
     by exists 1=> // h _ _ ; rewrite /quotR /shift eqv0 /= scaler0 add0r addrN scaler0.
   apply: flim_trans.
   + exact (flim_eq_loc eqnear0).
   + exact: cst_continuous.
-    (*WARNING : lim_cst from normedtype applies only to endofunctions
+    (*lim_cst from normedtype applies only to endofunctions
      That should NOT be the case, as one could use it insteas of cst_continuous *)
-- apply (cvgP (l := v *: l : Rcomplex R)).
+- apply (cvgP (l := v *: l : RComplex)).
+  (*normedtype seem difficulut to infer *)
+  (*Est-ce que on peut faire cohabiter plusieurs normes ? *)
   have eqnear0 : {near (locally' (0 : R^o)), (v \*: quotC) \o mulv =1 quotR}.
     exists 1 => // h _ neq0h //=; rewrite /quotC /quotR /mulv scale_inv //.
     rewrite scalerAl scalerCA -scalecAl mulrA -(mulrC v) mulfV // mul1r.
@@ -406,14 +401,14 @@ Lemma holo_CauchyRieman (f : C^o -> C^o) c : holomorphic f c -> CauchyRiemanEq f
 Proof.
 move=> H; rewrite /CauchyRiemanEq.
 pose quotC := fun h : C => h^-1 *: ((f \o shift c) h - f c).
-pose quotR := fun h : R => h^-1 *: ((f \o shift c) (h *: 1%:C ) - f c).
-pose quotiR := fun h : R => h^-1 *: ((f \o shift c) (h *: 'i%C) - f c).
+pose quotR := fun h : R => h^-1 *: ((f \o shift c) (h *: 1%:C ) - f c) : RComplex.
+pose quotiR := fun h : R => h^-1 *: ((f \o shift c) (h *: 'i%C) - f c) : (numFieldType_normedModType (complex_numFieldType R)). (*IMP*)  (* pbm with flim_map_lim*)
 have eqnear0x : {near (locally' (0:R^o)), quotC \o (fun h => h *: 1%:C) =1 quotR}.
   exists 1; first by [].
   by move => h  _ _ //=; simpc; rewrite /quotC /quotR real_complex_inv -scalecr; simpc.
 pose subsetfiltersx := flim_eq_loc eqnear0x.
 have -> : lim (quotR @ (locally' (0:R^o))) = lim (quotC @ (locally' (0:C^o))).
-  apply: (@flim_map_lim _ (Rcomplex_normedModType R)).
+  apply: (@flim_map_lim _ _). (*IMP*)
     exact: Proper_locally'_numFieldType.
   suff: quotR @ (locally' (0:R^o)) `=>` quotC @ (locally' (0:C^o)).
     move/flim_trans; apply.
@@ -438,8 +433,8 @@ have eqnear0y : {near (locally' (0:R^o)), 'i \*:quotC \o ( fun h => h *: 'i%C) =
 pose subsetfiltersy := (flim_eq_loc eqnear0y).
 have properlocally' : ProperFilter (locally'(0:C^o)).
   exact: Proper_locally'_numFieldType.
-have <- : lim ((quotiR : R -> (numFieldType_normedModType (complex_numFieldType R)) (*TODO: IMP*)) @ (locally' (0:R^o))) =
-    'i * lim (quotC @ (locally' (0:C^o))).
+have <- : lim (quotiR @ (locally' (0:R^o))) =
+     'i * lim (quotC @ (locally' (0:C^o))) .
   have -> : 'i * lim (quotC @ (locally' (0:C^o))) =  lim ('i \*: quotC @ (locally' (0:C^o))).
     by rewrite scalei_muli limin_scaler. (* exact: H. *)
   apply: flim_map_lim.
@@ -485,7 +480,8 @@ move => [der CR] c.
 (* Before 270: first attempt with littleo but requires to mix
  littleo on filter on different types. Check now*)
 suff :  exists l, forall h : C,
-      f (c + h) = f c + h * l + (('o_ (0 : [filteredType C^o of C^o]) id) : _ -> numFieldType_normedModType (complex_numFieldType R) (*IMP*)) h.
+      f (c + h) = f c + h * l + (('o_ (0 : [filteredType C^o of C^o]) id) : _
+-> numFieldType_normedModType (complex_numFieldType R) (*IMP*)) h.
   admit.
 (*This should be a lemma *)
 move: (der c 1%:C ); simpl => /cvg_ex [lr /flim_lim //= Dlr].
@@ -546,5 +542,3 @@ Proof.
 Admitted.
 
 End Holomorphe.
-
-End cauchyetoile.
