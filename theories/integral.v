@@ -1,13 +1,14 @@
 (* mathcomp analysis (c) 2017 Inria and AIST. License: CeCILL-C.              *)
 From Coq Require Import ssreflect ssrfun ssrbool.
-From mathcomp Require Import ssrnat eqtype choice fintype bigop ssralg ssrnum.
+From mathcomp Require Import ssrnat eqtype choice fintype order bigop ssralg.
+From mathcomp Require Import ssrnum.
 Require Import boolp reals ereal.
 Require Import classical_sets posnum topology normedtype.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
-Import GRing.Theory Num.Def Num.Theory.
+Import Order.TTheory GRing.Theory Num.Def Num.Theory.
 
 Reserved Notation "{ 'ae' P }" (at level 0, format "{ 'ae'  P }").
 
@@ -175,7 +176,7 @@ Variables (R : numFieldType) (X : Type) (mx : set X -> {ereal R}).
 Definition additive := forall A, triviset A -> forall n,
   mx (\bigcup_(i in (fun k => (k <= n)%N)) A i) = (\sum_(i < n.+1) mx (A i))%E.
 Definition sigma_additive := forall A, triviset A ->
-  mx (\bigcup_n A n) = ereallim (fun n : nat => (\sum_(i < n.+1) mx (A i))%E).
+  mx (\bigcup_n A n) = ereallim (fun n => (\sum_(i < n.+1) mx (A i))%E).
 End additivity.
 
 Lemma additive2 (R : numFieldType) X (mx : set X -> {ereal R}) :
@@ -224,15 +225,44 @@ Admitted.
 Section properties_of_measures.
 Variables (R : numFieldType) (X : measurableType) (mx : set X -> {ereal R}).
 Axiom measurable0 : mx set0 = 0%:E.
+Axiom measurable_ge0 : forall x, (0%:E <= mx x)%E.
 Axiom measurable_sigma_additive : sigma_additive mx.
 End properties_of_measures.
 
+Lemma lee_addl (R : numDomainType) (x y : {ereal R}) : (0%:E <= y)%E ->  (x <= x + y)%E.
+Proof.
+by move: x y => -[ x [y| |]//= | [| |]// | [| | ]//]; rewrite !lee_fin ler_addl.
+Qed.
+
+Lemma lee_add2l (R : numDomainType) (x a b : {ereal R}) :
+  (a <= b)%E -> (x + a <= x + b)%E.
+Proof.
+move: a b x => -[a [b [x /=|//|//] | []// |//] | []// | ].
+  by rewrite !lee_fin ler_add2l.
+by move=> -[b [|  |]// | [] | //].
+Qed.
+
+Lemma lee_add2r (R : numDomainType) (x a b : {ereal R}) :
+  (a <= b)%E -> (a + x <= b + x)%E.
+Proof. rewrite addeC (addeC b); exact: lee_add2l. Qed.
+
+(* measure is monotone *)
 Lemma measure_monotone (R : numFieldType) (X : measurableType) (mx : set X -> {ereal R}) :
   {homo mx : A B / A `<=` B >-> (A <= B)%E}.
 Proof.
-move=> A B AB.
-have : B = A `|` (B `\` A).
-Admitted.
+move=> A B AB; have {1}-> : B = A `|` (B `\` A).
+  rewrite funeqE => x; rewrite propeqE.
+  have [Ax|Ax] := pselect (A x).
+  split=> [Bx|]; by [left | move=> -[/AB //|] []].
+  split=> [Bx|]; by [right| move=> -[//|] []].
+rewrite additive2 // ?lee_addl //.
+exact: measurable_ge0.
+apply additive_implies_sigma_additive.
+exact: measurable0.
+exact: measurable_sigma_additive.
+rewrite setDE setICA (_ : _ `&` ~` _ = set0) ?setI0 //.
+by rewrite funeqE => x; rewrite propeqE; split => // -[].
+Qed.
 
 Section boole_inequality.
 Variables (R : numFieldType) (X : measurableType) (mx : set X -> {ereal R}).
@@ -276,6 +306,7 @@ exact: measurable0.
 exact: measurable_sigma_additive.
 Qed.
 
+(* measure satisfies Boole's inequality *)
 Lemma bool_le (A : nat -> set X) : forall n,
   (mx (\bigcup_(i in (fun k => (k <= n)%N)) A i) <= \sum_(i < n.+1) mx (A i))%E.
 Proof.
@@ -298,8 +329,12 @@ rewrite additive2; last 2 first.
   exact: measurable_sigma_additive.
   rewrite setIC -setIA (_ : ~` _ `&` _ = set0) ?setI0 //.
   by rewrite funeqE => x; rewrite propeqE; split => // -[].
-Admitted.
+rewrite (@le_trans _ _ (mx B + mx (A n.+1))%E) // ?lee_add2l //.
+rewrite measure_monotone //; first by apply subIset; left.
+by rewrite big_ord_recr /= lee_add2r.
+Qed.
 
+(* measure satisfies generalized Boole's inequality *)
 Lemma bool_le_gen (A : nat -> set X) :
   (mx (\bigcup_(n in setT) A n) <= ereallim (fun n => \sum_(i < n) mx (A i)))%E.
 Proof.
