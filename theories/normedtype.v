@@ -2211,46 +2211,88 @@ by exists a_ => n; rewrite /a_ /= /ssr_have; case: cid => ? [].
 Grab Existential Variables. all: end_near. Qed.
 
 Section open_closed_sets_numField.
-Variable R : numFieldType (* TODO: can we generalize to numFieldType? *).
+Variable R : numFieldType.
 Implicit Types y : R.
 
-Lemma ball_open (V : normedModType R) (x : V)
-      (r : R) : 0 < r -> open (ball x r).
+Lemma closed_eq y : closed [set x : R^o | x = y].
 Proof.
-rewrite openE -ball_normE /interior => r0 y /= Bxy; near=> z.
-rewrite /= (le_lt_trans (@ler_dist_add _ _ y _ _))// addrC -ltr_subr_addr.
-by near: z; apply: cvg_dist; rewrite // subr_gt0. 
-Grab Existential Variables. all: end_near.
+  by apply: compact_closed => //=; apply: compact1.
 Qed.
 
 Lemma open_neq y : open [set x : R^o | x != y].
 Proof.
-  set l := (x in open x).
-  replace (l) with (\bigcup_(i in [set z:R^o | z != y ]) (ball i `|i-y|)).
-  2:{
-    rewrite eqEsubset; split => z.
-    - case=> w /= w_not_y.
-      rewrite /ball /=.
-      move=> Q; apply/eqP => W.
-      by rewrite W mc_1_10.Num.Theory.lterr in Q.
-    - move => z_neq_y.
-      exists z => //=.
-      apply/ballxx; rewrite normr_gt0; apply/eqP.
-      by move=> /subr0_eq W; move: z_neq_y; rewrite W /= => /eqP ?.
-  }
-  apply: open_bigU => i /= /eqP neq0.
-  apply: ball_open.
-  rewrite normr_gt0.
-  apply/eqP => W; apply neq0.
-  by apply: subr0_eq.
+  suff ->: [set x | x != y] = (~`[set y]) by apply: openC; apply: closed_eq.
+  rewrite eqEsubset; split => z /=; rewrite /set1 /setC /=.
+  all: by move=>/eqP.
 Qed.
 
-Lemma closed_le y : closed [set x : R^o | x <= y].
+Let Rtop := [topologicalType of R^o].
+
+Lemma normr_closure {V : normedModType R} (D : set V) : 
+  @closure Rtop ([eta normr] @` D) `<=` [set x : R^o | 0 <= x].
 Proof.
-rewrite (_ : mkset _ = ~` [set x | x > y]); first exact: closedC.
-by rewrite predeqE => x /=; rewrite leNgt; split => /negP.
+  case emptyD: `[<D = set0>]. {
+    move: emptyD => /asboolP -> /=. 
+    by rewrite image_set0 closure0.
+  }
+  move: emptyD => /asboolP /eqP /set0P [d dD].
+  move=> r /=; rewrite closureEcluster.
+  rewrite (@cluster_cvgE Rtop (globally ([eta normr] @` D)) _).
+    2: by apply: (globally_properfilter (a := `|d|)); exists d.
+  case=> F ? [F_to_r DsubF].
+  have normF: F `=>` [eta normr] @ F. {
+    move => P /=; rewrite /nbhs /= => FnP.
+    have: (F ([set a | P `|a|] `&` [eta normr] @` D)).
+      apply: filterI => //=.
+      by apply: DsubF.
+    apply: filterS => x [/= nX [y nDy]] Q.
+    suff <- : (`|x| = x) by [].
+    apply: (eq_trans _ Q).
+    rewrite -[RHS]normr_id; symmetry.
+    by congr (`| _|).
+  }
+  have ?: (F --> (`|r| : R^o)). {
+    apply: (cvg_trans normF); apply: continuous_cvg => //=.
+    by apply: norm_continuous.
+  }
+  have ?: (`|r| = r). {
+    by apply: (@close_eq Rtop) => //=; apply: (@cvg_close _ F).
+  }
+  by rewrite ger0_def; apply/eqP.
 Qed.
 
+Lemma closed_ge_0 : 
+  closed [set x : R^o | 0 <= x].
+Proof.
+  suff W: (([eta normr] @` (@setT Rtop)) = [set x | 0 <= x] ).
+    apply/ closure_id; rewrite eqEsubset; split.
+    - by apply: subset_closure.
+    - by rewrite -{1}W; apply: normr_closure.
+  rewrite eqEsubset; split.
+    - by move => x /= [y _ <-]; apply normr_ge0.
+    - move=> x /=; rewrite ger0_def.
+      by move=> /eqP <-; exists x.
+Qed.
+
+Lemma closed_ge y: closed [set x : R^o | y <= x].
+Proof.
+  have <-: ((fun x => x - y) @^-1` [set x | 0 <= x]  = [set x | y <= x] )
+    by (rewrite eqEsubset; split => z /=; rewrite subr_ge0).
+  apply: (@closed_comp Rtop Rtop) => /=.
+  2: by apply closed_ge_0.
+  move => ? ?; apply: continuousD => //=.
+  by apply: cvg_cst.
+Qed.
+
+Lemma closed_le y: closed [set x : R^o | x <= y].
+Proof.
+  have <-: ((fun x => -x) @^-1` [set x | -y <= x]  = [set x | x <= y] ).
+    by (rewrite eqEsubset; split => z /=; rewrite ler_oppr opprK).
+  apply: (@closed_comp Rtop Rtop) => /=.
+  2: by apply closed_ge.
+  by move => ? ?; apply: continuousN => //=.
+Qed.
+    
 End open_closed_sets_numField.
 
 Section open_closed_sets_realField.
@@ -2270,24 +2312,6 @@ by rewrite /= distrC ltr_distl opprB addrCA subrr addr0 => /andP[].
 Qed.
 Hint Resolve open_gt : core.
 
-Lemma closed_le y : closed [set x : R^o | x <= y].
-Proof.
-rewrite (_ : mkset _ = ~` [set x | x > y]); first exact: closedC.
-by rewrite predeqE => x /=; rewrite leNgt; split => /negP.
-Qed.
-
-Lemma closed_ge y : closed [set x : R^o | y <= x].
-Proof.
-rewrite (_ : mkset _ = ~` [set x | x < y]); first exact: closedC.
-by rewrite predeqE => x /=; rewrite leNgt; split => /negP.
-Qed.
-
-Lemma closed_eq y : closed [set x : R^o | x = y].
-Proof.
-rewrite [X in closed X](_ : (eq^~ _) = ~` (xpredC (eq_op^~ y))).
-  by apply: closedC; exact: open_neq.
-by rewrite predeqE /setC => x /=; rewrite (rwP eqP); case: eqP; split.
-Qed.
 
 (* TODO: move after rebase on mathcomp 1.12?  *)
 Definition isBOpen (b : itv_bound R) :=
@@ -2322,7 +2346,7 @@ move: a b => [[]//a|] [[]//b|] _ _.
 - by rewrite (_ : mkset _ = setT); [exact: closedT|rewrite predeqE].
 Qed.
 
-End open_closed_sets.
+End open_closed_sets_realField.
 
 Hint Extern 0 (open _) => now apply: open_gt : core.
 Hint Extern 0 (open _) => now apply: open_lt : core.

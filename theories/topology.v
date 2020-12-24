@@ -2901,6 +2901,18 @@ Proof.
 move=> f_prop fl; apply: get_unique => // l' fl'; exact: cvgi_unique _ fl' fl.
 Qed.
 
+Lemma compact1 (x : T) : compact [set x].
+Proof.
+  move=> F [^ F] Fx; exists x; split => //.
+  move=> U B /(filterI Fx) hU /nbhs_singleton ?.
+  exists x; split => //=.
+  suff : ([set x] `&` U !=set0). 
+    by case=> ? [ ]; rewrite /set1 => ->.
+  apply/set0P/eqP => W; apply Ffilter_not_empty.
+  replace xpredp0 with (@set0 T) by done.
+  by rewrite -W.
+Qed.
+
 End separated_topologicalType.
 
 Section connected_sets.

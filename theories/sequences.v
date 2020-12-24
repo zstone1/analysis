@@ -286,7 +286,7 @@ End sequences_R_lemmas_realFieldType.
 
 Lemma cvg_le_0 
     {R : numFieldType} (T : topologicalType) 
-    (f : T -> R) (p q : R^o) (a : set(set(T))) {aa: ProperFilter a}: 
+    (f : T -> R) (q : R^o) (a : set(set(T))) {aa: ProperFilter a}: 
   (\forall x \near a, 0 <= f x) ->
   f @ a --> q -> 
   0 <= q.
@@ -295,10 +295,29 @@ Proof.
   apply: (@closed_cvg_loc T [topologicalType of R^o] a _ f ([set u | 0 <= u])).
   - by [].
   - by apply: posf.
-  Locate closed_eq.
-  - apply: openC.
+  - apply closed_ge.
+Qed.
 
-  have cvg_diff (f - g @ a --> p - q)
+Lemma cvg_le
+    {R : numFieldType} (T : topologicalType) 
+    (f g : T -> R) (p q : R^o) (a : set(set(T))) {aa: ProperFilter a}: 
+  (\forall x \near a, g x <= f x) ->
+  f @ a --> q -> 
+  g @ a --> p -> 
+  p <= q.
+Proof.
+  move => posf f_to_q g_to_p.
+  have fgcvg : f - g @a --> q - p
+    by apply: (@cvgB R [normedModType R of R^o]).
+  rewrite -subr_ge0.
+  apply: cvg_le_0 fgcvg. 
+  near=> b; rewrite /GRing.add /= /GRing.opp /=. 
+  rewrite subr_ge0.
+  near: b.
+  apply posf.
+Grab Existential Variables.
+all: end_near.
+Qed.
 
 Lemma squeeze_gen 
     {R : numFieldType} {V : normedModType R} 
@@ -315,6 +334,7 @@ Proof.
     replace (0:R^o) with ([eta normr]  (0 : V^o)) by (rewrite normrE //=).
     apply: (@continuous_cvg _ _ [topologicalType of R^o] _ _ _ [eta normr] _ _ hf_0_diff_V) .
     by apply: norm_continuous.
+  have gcts : {continuous g}.
   have fg_0_diff_R : (f - g) @ a --> (0 : V^o).
     apply: cvg_dist0.
     apply squeeze with (f := fun=> 0) (h := (fun x => `|h x - f x|)).
