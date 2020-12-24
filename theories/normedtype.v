@@ -2210,10 +2210,52 @@ have @a_ : nat -> T^o.
 by exists a_ => n; rewrite /a_ /= /ssr_have; case: cid => ? [].
 Grab Existential Variables. all: end_near. Qed.
 
-Section open_closed_sets.
-Variable R : realFieldType (* TODO: can we generalize to numFieldType? *).
+Section open_closed_sets_numField.
+Variable R : numFieldType (* TODO: can we generalize to numFieldType? *).
 Implicit Types y : R.
 
+Lemma ball_open (V : normedModType R) (x : V)
+      (r : R) : 0 < r -> open (ball x r).
+Proof.
+rewrite openE -ball_normE /interior => r0 y /= Bxy; near=> z.
+rewrite /= (le_lt_trans (@ler_dist_add _ _ y _ _))// addrC -ltr_subr_addr.
+by near: z; apply: cvg_dist; rewrite // subr_gt0. 
+Grab Existential Variables. all: end_near.
+Qed.
+
+Lemma open_neq y : open [set x : R^o | x != y].
+Proof.
+  set l := (x in open x).
+  replace (l) with (\bigcup_(i in [set z:R^o | z != y ]) (ball i `|i-y|)).
+  2:{
+    rewrite eqEsubset; split => z.
+    - case=> w /= w_not_y.
+      rewrite /ball /=.
+      move=> Q; apply/eqP => W.
+      by rewrite W mc_1_10.Num.Theory.lterr in Q.
+    - move => z_neq_y.
+      exists z => //=.
+      apply/ballxx; rewrite normr_gt0; apply/eqP.
+      by move=> /subr0_eq W; move: z_neq_y; rewrite W /= => /eqP ?.
+  }
+  apply: open_bigU => i /= /eqP neq0.
+  apply: ball_open.
+  rewrite normr_gt0.
+  apply/eqP => W; apply neq0.
+  by apply: subr0_eq.
+Qed.
+
+Lemma closed_le y : closed [set x : R^o | x <= y].
+Proof.
+rewrite (_ : mkset _ = ~` [set x | x > y]); first exact: closedC.
+by rewrite predeqE => x /=; rewrite leNgt; split => /negP.
+Qed.
+
+End open_closed_sets_numField.
+
+Section open_closed_sets_realField.
+Variable R : realFieldType.
+Implicit Types y : R.
 Lemma open_lt y : open [set x : R^o | x < y].
 Proof.
 move=> x /=; rewrite -subr_gt0 => yDx_gt0; exists (y - x) => // z.
@@ -2227,13 +2269,6 @@ move=> x /=; rewrite -subr_gt0 => xDy_gt0; exists (x - y) => // z.
 by rewrite /= distrC ltr_distl opprB addrCA subrr addr0 => /andP[].
 Qed.
 Hint Resolve open_gt : core.
-
-Lemma open_neq y : open [set x : R^o | x != y].
-Proof.
-rewrite (_ : mkset _ = [set x | x < y] `|` [set x | x > y]); first exact: openU.
-rewrite predeqE => x /=; rewrite eq_le !leNgt negb_and !negbK orbC.
-by symmetry; apply (rwP orP).
-Qed.
 
 Lemma closed_le y : closed [set x : R^o | x <= y].
 Proof.

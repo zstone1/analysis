@@ -284,6 +284,50 @@ Qed.
 
 End sequences_R_lemmas_realFieldType.
 
+Lemma cvg_le_0 
+    {R : numFieldType} (T : topologicalType) 
+    (f : T -> R) (p q : R^o) (a : set(set(T))) {aa: ProperFilter a}: 
+  (\forall x \near a, 0 <= f x) ->
+  f @ a --> q -> 
+  0 <= q.
+Proof.
+  move => posf f_to_q.
+  apply: (@closed_cvg_loc T [topologicalType of R^o] a _ f ([set u | 0 <= u])).
+  - by [].
+  - by apply: posf.
+  Locate closed_eq.
+  - apply: openC.
+
+  have cvg_diff (f - g @ a --> p - q)
+
+Lemma squeeze_gen 
+    {R : numFieldType} {V : normedModType R} 
+    (T : topologicalType) (f g h : T -> V) (a : filter_on T) :
+  (\forall x \near a, `|f x - g x| <= `|h x - f x|) -> forall (l : V),
+  f @ a --> (l : V^o) -> h @ a --> (l : V^o) -> g @ a --> (l : V^o).
+Proof.
+  move => fg_small_diff l f_cvg h_cvg.
+  have hf_0_diff_V : ((h - f) @ a --> (0 : V^o)).
+    replace 0 with (l - l) by (apply: subrr).
+    by apply: @cvgB => //=.
+  have hf_0_diff_R : (fun x => `|(h x - f x)|) @ a --> (0 : R^o).
+    replace (fun x => `|h x - f x|) with ((fun x => `|x|) \o (h - f)) by (done).
+    replace (0:R^o) with ([eta normr]  (0 : V^o)) by (rewrite normrE //=).
+    apply: (@continuous_cvg _ _ [topologicalType of R^o] _ _ _ [eta normr] _ _ hf_0_diff_V) .
+    by apply: norm_continuous.
+  have fg_0_diff_R : (f - g) @ a --> (0 : V^o).
+    apply: cvg_dist0.
+    apply squeeze with (f := fun=> 0) (h := (fun x => `|h x - f x|)).
+    2: by apply: (@cvg_cst [topologicalType of R^o]).
+    2: by [].
+    near=> x; apply/andP; split => //=; near: x.
+    by apply fg_small_diff.
+  have : (f - (f - g)) @ a --> (l - 0 : V^o).
+    by apply: cvgB => //=.
+  by rewrite subr0 opprB addrCA subrr addr0.
+Grab Existential Variables. all: end_near. 
+Qed.
+
 Section partial_sum.
 Variables (V : zmodType) (u_ : V ^nat).
 
@@ -691,7 +735,7 @@ by near: n; apply: nbhs_infty_ge.
 Grab Existential Variables. all: end_near. Qed.
 
 (* Cyril: I think the shortest proof would rely on cauchy completion *)
-Lemma cvg_expr (R : archiFieldType) (z : R) :
+Lemma cvg_expr (R : numFieldType) (z : R) :
   `|z| < 1 -> (@GRing.exp R z : R^o^nat) --> (0 : R^o).
 Proof.
 move=> Nz_lt1; apply: cvg_dist0; pose t := (1 - `|z|).
@@ -715,7 +759,7 @@ rewrite seriesEnat !mulrBr [in LHS]mulr1 mulr_suml -opprB -sumrB.
 by under eq_bigr do rewrite -mulrA -exprSr; rewrite telescope_sumr// opprB.
 Qed.
 
-Lemma cvg_geometric_series (R : archiFieldType) (a z : R) : `|z| < 1 ->
+Lemma cvg_geometric_series (R : numFieldType) (a z : R) : `|z| < 1 ->
   series (geometric a z) --> (a * (1 - z)^-1 : R^o).
 Proof.
 move=> Nz_lt1; rewrite geometric_seriesE ?lt_eqF 1?ltr_normlW//.
