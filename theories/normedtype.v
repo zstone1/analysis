@@ -2678,12 +2678,16 @@ Export BanachAlgebra.Exports.
 
 Section complex_real_norms.
 From mathcomp Require Import all_real_closed.
-Context {R : numDomainType} {K : numFieldType} {V : normedAlgType K}.
+Context {R : numFieldType} {K : numFieldType} {V : pseudoMetricNormedZmodType K}.
 
 Variable (Re : {rmorphism K -> R}).
+Variable (Lift : {rmorphism R -> R}).
 Local Notation "`&| x |" := (Re `|x|).
 Parameter (re_le : {homo Re : x y / x <= y >-> x <= y}).
+Parameter (re_lt : {homo Re : x y / x < y >-> x < y}).
 Parameter (re_0_le : forall c, Re c = 0 ->  0 <= c -> c = 0).
+Parameter (re_0_lt : forall x y, 0 <= x -> 0 <= y -> Re x < Re y -> x < y).
+Parameter (re_surj : forall x : R, 0 < x -> exists y : K, Re y = x /\ 0 < y).
 
 Lemma tri (x y : V): `&|x + y| <= `&|x| + `&|y|.
 Proof. 
@@ -2713,13 +2717,58 @@ Definition Re_normed_mixin :=
 Definition Re_normedZModType := 
   Num.NormedZmodule.Pack (Phant R) (Num.NormedZmodule.Class Re_normed_mixin).
 
-Definition Re_Pseudometric_mixin := 
+Definition Re_Pseudometric_mixin : 
+  PseudoMetric.mixin_of R (entourage_ (ball_ (fun x => `&|x|)))  := 
   @pseudoMetric_of_normedDomain R (Re_normedZModType).
+
+Lemma Re_entE : 
+  entourage_ (ball_ (fun (x:V) => `|x|)) = 
+  entourage_ (ball_ (fun (x:V) => `&|x|)).
+Proof.
+  rewrite eqEsubset; split.
+  - move=> P /= [/= epsK epsKpos epsK_sub_P].
+    exists (Re epsK).
+      1: by rewrite -(rmorph0 Re) /=; apply: re_lt.
+    move=> t /= t_lt; apply: epsK_sub_P => /=.
+    by apply: re_0_lt => //=; apply ltW.
+  - move=> P /= [/= epsR epsRpos epsR_sub_P].
+    have [epsK [E epsKpos]] := @re_surj epsR ltac:(auto).
+    exists epsK => //.
+    move => t /= t_lt; apply epsR_sub_P.
+    by rewrite -E; apply re_lt.
+Qed.
+
+Lemma Re_Pseudometric_mixin_patch : 
+  PseudoMetric.mixin_of R (entourage_ (ball_ [eta (@normr K V)])).   
+Proof.
+  rewrite Re_entE.
+  exact Re_Pseudometric_mixin.
+Qed.
+Lemma filter_opE : 
+  Filtered.nbhs_op (Filtered.class V) = nbhs_ (entourage_ (ball_ (fun x => `&|x|))).
+Proof.
+  rewrite (Uniform.ax5 (PseudoMetric.class V)); congr (nbhs_ _). 
+  rewrite (PseudoMetric.ax4 (PseudoMetric.class V)) -Re_entE.
+  by have [->] :=PseudoMetricNormedZmodule.mixin (PseudoMetricNormedZmodule.class V).
+Qed.
+
+Definition Re_uniformType :=
+  @Uniform.Class V^o 
+    (Topological.class (TopologicalType _
+      (topologyOfEntourageMixin
+        (uniformityOfBallMixin
+          filter_opE
+            Re_Pseudometric_mixin)))) 
+   (uniformityOfBallMixin filter_opE Re_Pseudometric_mixin).
+
+Definition Re_PseudoMetric_class := 
+  @PseudoMetric.Class R V^o Re_uniformType Re_Pseudometric_mixin.
 
 Definition Re_pseudoMetricZmod_mixin := 
   @PseudoMetricNormedZmodule.Mixin R Re_normedZModType _ 
     Re_Pseudometric_mixin (ltac:(auto)).
 
+Definition foo := PseudoMetricType V Re_Pseudometric_mixin.
 Definition Re_PseudoMetricNormedZmodule := 
   @PseudoMetricNormedZmodule.pack _ (Phant R) V^o _
   _ _ Re_pseudoMetricZmod_mixin Re_normedZModType _ idfun
