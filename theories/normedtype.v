@@ -546,7 +546,6 @@ Hint Extern 0 (is_true (0 < _)) => match goal with
     solve[near: x; exists 0 => _/posnumP[x] //] end : core.
 
 (** ** Modules with a norm *)
-
 Module NormedModule.
 
 Record mixin_of (K : numDomainType)
@@ -2213,19 +2212,19 @@ have @a_ : nat -> T^o.
 by exists a_ => n; rewrite /a_ /= /ssr_have; case: cid => ? [].
 Grab Existential Variables. all: end_near. Qed.
 
-Definition banach_alg_ax1 (K : numDomainType) (V : Type)
+Definition normed_alg_ax1 (K : numDomainType) (V : Type)
   (normr : V -> K) (alg_prod : V -> V -> V) := 
     (forall (x y : V), normr (alg_prod x y) <= (normr x ) * (normr y)).
 
-Definition banach_alg_ax2 (K : numDomainType) (V : Type) (one : V)
+Definition normed_alg_ax2 (K : numDomainType) (V : Type) (one : V)
   (normr : V -> K) := normr one = 1.
 
-Module UnitalBanachAlgebra.
+Module NormedAlgebra.
 
 Record mixin_of (K : numDomainType) (V : Type)
   (normr : V -> K) (alg_prod : V -> V -> V) (one : V) := Mixin {
-  _ : banach_alg_ax1 normr alg_prod;
-  _ : banach_alg_ax2 one normr;
+  _ : normed_alg_ax1 normr alg_prod;
+  _ : normed_alg_ax2 one normr;
 }.
 
 Section ClassDef.
@@ -2233,7 +2232,7 @@ Section ClassDef.
 Variable K : numFieldType.
 
 Record class_of (V : Type) := Class {
-  base : CompleteNormedModule.class_of K V;
+  base : NormedModule.class_of K V;
   ring_mixin : GRing.Ring.mixin_of (GRing.Zmodule.Pack base);
   unit_mixin : GRing.UnitRing.mixin_of 
     (GRing.Ring.Pack (GRing.Ring.Class ring_mixin));
@@ -2245,12 +2244,12 @@ Record class_of (V : Type) := Class {
     (@GRing.Lalgebra.Pack _ _ V 
       (@GRing.Lalgebra.Class K V (GRing.Ring.Class _) _ (lalg_mixin)));
   mixin : @mixin_of K V 
-            (@normr K (CompleteNormedModule.Pack (Phant K) base)) 
+            (@normr K (NormedModule.Pack (Phant K) base)) 
             (GRing.Ring.mul ring_mixin)
             (GRing.Ring.one ring_mixin);
 }.
 
-Local Coercion base : class_of >-> CompleteNormedModule.class_of.
+Local Coercion base : class_of >-> NormedModule.class_of.
 Local Coercion mixin : class_of >-> mixin_of.
 Local Definition mkRingClass T (c : class_of T) : GRing.Ring.class_of T :=
   (GRing.Ring.Class (ring_mixin c)).
@@ -2304,41 +2303,16 @@ Definition pseudoMetricType := @PseudoMetric.Pack K cT xclass.
 Definition pseudoMetricNormedZmodType :=
   @PseudoMetricNormedZmodule.Pack K phK cT xclass.
 Definition normedModType := @NormedModule.Pack K phK cT xclass.
-Definition completeType := @Complete.Pack cT xclass.
-Definition completePseudoMetricType := @CompletePseudoMetric.Pack K cT xclass.
-Definition completeNormedModType := @CompleteNormedModule.Pack K phK cT xclass.
-Definition complete_zmodType := @GRing.Zmodule.Pack completeType xclass.
-Definition complete_lmodType := @GRing.Lmodule.Pack K phK completeType xclass.
 Definition ringType := @GRing.Ring.Pack cT xclass.
 Definition unitRingType : GRing.UnitRing.type := @GRing.UnitRing.Pack cT xclass.
 Definition lalgebraType := @GRing.Lalgebra.Pack K phK cT xclass.
 Definition algebraType := @GRing.Algebra.Pack K phK cT xclass.
 Definition unitAlgebraType := @GRing.UnitAlgebra.Pack K phK cT xclass.
-Definition complete_normedZmodType := @Num.NormedZmodule.Pack K phK completeType xclass.
-Definition complete_pseudoMetricNormedZmodType :=
-  @PseudoMetricNormedZmodule.Pack K phK completeType xclass.
-Definition complete_normedModType := @NormedModule.Pack K phK completeType xclass.
-Definition completePseudoMetric_lmodType : GRing.Lmodule.type phK :=
-  @GRing.Lmodule.Pack K phK (CompletePseudoMetric.sort completePseudoMetricType)
-  xclass.
-Definition completePseudoMetric_zmodType : GRing.Zmodule.type :=
-  @GRing.Zmodule.Pack (CompletePseudoMetric.sort completePseudoMetricType)
-  xclass.
-Definition completePseudoMetric_normedModType : NormedModule.type phK :=
-  @NormedModule.Pack K phK (CompletePseudoMetric.sort completePseudoMetricType)
-  xclass.
-Definition completePseudoMetric_normedZmodType : Num.NormedZmodule.type phK :=
-  @Num.NormedZmodule.Pack K phK
-  (CompletePseudoMetric.sort completePseudoMetricType) xclass.
-Definition completePseudoMetric_pseudoMetricNormedZmodType :
-  PseudoMetricNormedZmodule.type phK :=
-  @PseudoMetricNormedZmodule.Pack K phK
-  (CompletePseudoMetric.sort completePseudoMetricType) xclass.
 End ClassDef.
 
 Module Exports.
 
-Coercion base : class_of >-> CompleteNormedModule.class_of.
+Coercion base : class_of >-> NormedModule.class_of.
 Coercion base2 : class_of >-> GRing.UnitAlgebra.class_of.
 Coercion sort : type >-> Sortclass.
 Coercion eqType : type >-> Equality.type.
@@ -2375,36 +2349,30 @@ Coercion pseudoMetricType : type >-> PseudoMetric.type.
 Canonical pseudoMetricType.
 Coercion normedModType : type >-> NormedModule.type.
 Canonical normedModType.
-Coercion completeType : type >-> Complete.type.
-Canonical completeType.
-Coercion completePseudoMetricType : type >-> CompletePseudoMetric.type.
-Canonical completePseudoMetricType.
-Coercion completeNormedModType : type >-> CompleteNormedModule.type.
-Canonical completeNormedModType.
-Notation unitalBanachAlgType K := (type (Phant K)).
-Notation "[ 'unitalBanachAlgType' K 'of' T ]" := (@pack _ (Phant K) T _ _ idfun _ _ idfun)
-  (at level 0, format "[ 'unitalBanachAlgType'  K  'of'  T ]") : form_scope.
+Notation normedAlgType K := (type (Phant K)).
+Notation "[ 'normedAlgType' K 'of' T ]" := (@pack _ (Phant K) T _ _ idfun _ _ idfun)
+  (at level 0, format "[ 'normedAlgType'  K  'of'  T ]") : form_scope.
 End Exports.
-End UnitalBanachAlgebra.
+End NormedAlgebra.
 
-Export UnitalBanachAlgebra.Exports.
+Export NormedAlgebra.Exports.
 
-Section banach_algebra_lemmas.
-Context {K : numFieldType} {V : unitalBanachAlgType K}.
+Section normed_algebra_lemmas.
+Context {K : numFieldType} {V : normedAlgType K}.
 
-Lemma normB1 : `|(1:V)| = 1.
+Lemma norm1alg : `|(1:V)| = 1.
 Proof.
   move: V => [? [] ? ? ? ? ? [/= ? +]].
-  by rewrite /banach_alg_ax2 /= => ->.
+  by rewrite /normed_alg_ax2 /= => ->.
 Qed.
 
-Lemma normBmul_le (x y: V) : `|x * y| <= `|x| * `|y|.
+Lemma mulr_norm_le (x y: V) : `|x * y| <= `|x| * `|y|.
 Proof.
   move: V x y => [? [] ? ? ? ? ? [/= ? +]].
-  by rewrite /banach_alg_ax1 /=.
+  by rewrite /normed_alg_ax1 /=.
 Qed.
 
-Lemma normBinvr (x : V) : x \is a GRing.unit -> `|x|^-1 <= `|x^-1|.
+Lemma invr_normr (x : V) : x \is a GRing.unit -> `|x|^-1 <= `|x^-1|.
 Proof.
   move=> xU; rewrite -[x in x<= _]mul1r -[x in _<=x]mulr1.
   have nxU : `|x| \is a GRing.unit.
@@ -2413,16 +2381,16 @@ Proof.
   rewrite -{2}(divrr nxU) mulrA.
   apply: ler_pmul => //=.
     1: by rewrite invr_ge0 normrE.
-  apply: le_trans (normBmul_le _ _).
-  by rewrite  mulVr // ?normB1.
+  apply: le_trans (mulr_norm_le _ _).
+  by rewrite  mulVr // ?norm1alg.
 Qed.
 
 Lemma normBmul_le_n (n : nat) (x y: V) : `|x ^+n | <= `|x| ^n.
 Proof.
   elim: n.
-    by rewrite expr0z expr0 normB1.
+    by rewrite expr0z expr0 norm1alg.
   move=> n IH; rewrite exprS exprSz.
-  apply: le_trans;[by apply: normBmul_le|].
+  apply: le_trans;[by apply: mulr_norm_le|].
   by apply: ler_pmul.
 Qed.
 
@@ -2448,7 +2416,7 @@ Proof.
   case: W => //= [[/=x y] [bX bY]] M.
   near=> l z => /=.
   rewrite (@distm_lt_split _ _ (a * z)) // -?mulrBr -?mulrBl. 
-  all: apply: (le_lt_trans (normBmul_le _ _)).
+  all: apply: (le_lt_trans (mulr_norm_le _ _)).
   - set L := (x in x < _).
     have ->: L = `| (`|a| * `|b - b|) - L|. {
       rewrite subrr normrE mulr0 add0r normrE /L.
@@ -2501,7 +2469,7 @@ Proof.
     by apply: norm_continuous.
     by apply: continuous_BM.
 Qed.
-
+(*
 Definition spectrum (v : V) := 
   [set k : K^o | ~ (v - k*: 1) \is a GRing.unit ].
 
@@ -2553,8 +2521,8 @@ Proof.
     rewrite -scalerA -scalerBr scaler_unit //.
     by rewrite unitfE.
 Qed.
-
-End banach_algebra_lemmas.
+*)
+End normed_algebra_lemmas.
 
 Lemma numDomain_lalgAxiom {R: numDomainType} : 
   GRing.Lalgebra.axiom (fun (x y:R^o) => x *y).
@@ -2570,27 +2538,27 @@ Proof.
   by rewrite [LHS]mulrA [x in x * _ = _] mulrC mulrA.
 Qed.
 
-Section real_banach.
-Context {R: realType}.
+Section numDomain_normedAlgebra.
+Context {R: numFieldType}.
 
-Program Definition realType_unitalBanachAlgebraMixin := 
-  @UnitalBanachAlgebra.Mixin R R normr (fun x y=> x * y) 1 _ _.
+Program Definition numFieldType_normedAlgebraMixin := 
+  @NormedAlgebra.Mixin R R normr (fun x y=> x * y) 1 _ _.
 Next Obligation.
-  rewrite /banach_alg_ax1 => ? ?.
+  rewrite /normed_alg_ax1 => ? ?.
   by rewrite -R_normZ.
 Qed.
 Next Obligation.
-  by rewrite /banach_alg_ax2 normrE.
+  by rewrite /normed_alg_ax2 normrE.
 Qed.
 
-Program Definition realType_unitalBanachAlgebraClass :=
-  (@UnitalBanachAlgebra.Class R R 
-    (CompleteNormedModule.class (R_CompleteNormedModule R))
+Program Definition numFieldType_normedAlgebraClass :=
+  (@NormedAlgebra.Class R R 
+    (NormedModule.class [normedModType R of R^o])
     (GRing.UnitRing.class [unitRingType of R])
     (GRing.UnitRing.mixin (GRing.UnitRing.class [unitRingType of R])) 
     numDomain_lalgAxiom
     numDomain_algAxiom
-    realType_unitalBanachAlgebraMixin
+    numFieldType_normedAlgebraMixin
   ).
 Next Obligation.
   congr (_ _).
@@ -2598,12 +2566,178 @@ Next Obligation.
   by destruct l.
 Qed.
 
-Definition realType_unitalBanachAlgebraType := 
-  UnitalBanachAlgebra.Pack (Phant R) realType_unitalBanachAlgebraClass.
-End real_banach.
+Definition numfieldtype_normedalgebratype := 
+  NormedAlgebra.Pack (Phant R) numFieldType_normedAlgebraClass.
+End numDomain_normedAlgebra.
 
-Canonical realType_unitalBanachAlgebraType.
+Canonical numfieldtype_normedalgebratype.
 
+Module BanachAlgebra.
+
+Section ClassDef.
+Variable K : numFieldType.
+
+Record class_of (T : Type) := Class {
+  base : NormedAlgebra.class_of K T ;
+  mixin : Complete.axiom (PseudoMetric.Pack base)
+}.
+
+Local Coercion base : class_of >-> NormedAlgebra.class_of.
+Local Coercion base2 T (c : class_of T) : CompleteNormedModule.class_of K T :=
+  @CompleteNormedModule.Class K T (base c) (mixin (c:=c)) .
+
+Structure type (phK : phant K) :=
+  Pack { sort; _ : class_of sort }.
+Local Coercion sort : type >-> Sortclass.
+
+Variables (phK : phant K) (T : Type) (cT : type phK).
+
+Definition class := let: Pack _ c := cT return class_of cT in c.
+Definition clone c of phant_id class c := @Pack phK T c.
+Let xT := let: Pack T _ := cT in T.
+Notation xclass := (class : class_of xT).
+
+Definition pack :=
+  fun bT (b : NormedAlgebra.class_of K T) & phant_id (@NormedAlgebra.class K phK bT) b =>
+  fun mT m & phant_id (@Complete.class mT) (@Complete.Class T b m) =>
+    Pack phK (@Class T b m).
+
+
+Definition eqType := @Equality.Pack cT xclass.
+Definition choiceType := @Choice.Pack cT xclass.
+Definition zmodType := @GRing.Zmodule.Pack cT xclass.
+Definition normedZmodType := @Num.NormedZmodule.Pack K phK cT xclass.
+Definition lmodType := @GRing.Lmodule.Pack K phK cT xclass.
+Definition ringType := @GRing.Ring.Pack cT xclass.
+Definition unitRingType : GRing.UnitRing.type := @GRing.UnitRing.Pack cT xclass.
+Definition lalgebraType := @GRing.Lalgebra.Pack K phK cT xclass.
+Definition algebraType := @GRing.Algebra.Pack K phK cT xclass.
+Definition unitAlgebraType := @GRing.UnitAlgebra.Pack K phK cT xclass.
+Definition pointedType := @Pointed.Pack cT xclass.
+Definition filteredType := @Filtered.Pack cT cT xclass.
+Definition topologicalType := @Topological.Pack cT xclass.
+Definition uniformType := @Uniform.Pack cT xclass.
+Definition pseudoMetricType := @PseudoMetric.Pack K cT xclass.
+Definition pseudoMetricNormedZmodType := @PseudoMetricNormedZmodule.Pack K phK cT xclass.
+Definition normedModType := @NormedModule.Pack K phK cT xclass.
+Definition completeNormedModType := @CompleteNormedModule.Pack K phK cT xclass.
+Definition pointed_lmodType := @GRing.Lmodule.Pack K phK pointedType xclass.
+Definition filtered_lmodType := @GRing.Lmodule.Pack K phK filteredType xclass.
+Definition topological_lmodType := @GRing.Lmodule.Pack K phK topologicalType xclass.
+Definition uniform_lmodType := @GRing.Lmodule.Pack K phK uniformType xclass.
+Definition pseudoMetric_lmodType := @GRing.Lmodule.Pack K phK pseudoMetricType xclass.
+Definition normedZmod_lmodType := @GRing.Lmodule.Pack K phK normedZmodType xclass.
+Definition pseudoMetricNormedZmod_lmodType := @GRing.Lmodule.Pack K phK pseudoMetricNormedZmodType xclass.
+End ClassDef.
+
+Module Exports.
+
+Coercion base : class_of >-> NormedAlgebra.class_of.
+Coercion base2 : class_of >-> CompleteNormedModule.class_of.
+Coercion sort : type >-> Sortclass.
+Coercion eqType : type >-> Equality.type.
+Canonical eqType.
+Coercion choiceType : type >-> Choice.type.
+Canonical choiceType.
+Coercion zmodType : type >-> GRing.Zmodule.type.
+Canonical zmodType.
+Coercion pseudoMetricNormedZmodType : type >-> PseudoMetricNormedZmodule.type.
+Canonical pseudoMetricNormedZmodType.
+Coercion normedZmodType : type >-> Num.NormedZmodule.type.
+Canonical normedZmodType.
+Coercion lmodType : type >-> GRing.Lmodule.type.
+Canonical lmodType.
+Coercion ringType : type >-> GRing.Ring.type.
+Canonical ringType.
+Coercion unitRingType : type >-> GRing.UnitRing.type.
+Canonical unitRingType.
+Coercion lalgebraType : type >-> GRing.Lalgebra.type.
+Canonical lalgebraType.
+Coercion algebraType : type >-> GRing.Algebra.type.
+Canonical algebraType.
+Coercion unitAlgebraType : type >-> GRing.UnitAlgebra.type.
+Canonical unitAlgebraType.
+Coercion pointedType : type >-> Pointed.type.
+Canonical pointedType.
+Coercion filteredType : type >-> Filtered.type.
+Canonical filteredType.
+Coercion topologicalType : type >-> Topological.type.
+Canonical topologicalType.
+Coercion uniformType : type >-> Uniform.type.
+Canonical uniformType.
+Coercion pseudoMetricType : type >-> PseudoMetric.type.
+Canonical pseudoMetricType.
+Coercion normedModType : type >-> NormedModule.type.
+Canonical normedModType.
+Notation banachAlgType K := (type (Phant K)).
+Notation "[ 'banachAlgType' K 'of' T ]" := (@pack _ (Phant K) T _ _ idfun _ _ idfun)
+  (at level 0, format "[ 'banachAlgType'  K  'of'  T ]") : form_scope.
+End Exports.
+End BanachAlgebra.
+Export BanachAlgebra.Exports.
+
+Section complex_real_norms.
+From mathcomp Require Import all_real_closed.
+Context {R : numDomainType} {K : numFieldType} {V : normedAlgType K}.
+
+Variable (Re : {rmorphism K -> R}).
+Local Notation "`&| x |" := (Re `|x|).
+Parameter (re_le : {homo Re : x y / x <= y >-> x <= y}).
+Parameter (re_0_le : forall c, Re c = 0 ->  0 <= c -> c = 0).
+
+Lemma tri (x y : V): `&|x + y| <= `&|x| + `&|y|.
+Proof. 
+  by rewrite -rmorphD; apply re_le; apply ler_norm_add.
+Qed.
+
+Lemma rnorm0 (x : V): `&|x| = 0 -> x = 0. 
+Proof. 
+  move=>nx0; apply/eqP/(@normr0P _ V).
+  have := normr_ge0 x.
+  by move:nx0; apply re_0_le.
+Qed.
+
+Lemma rnorm_addn (x : V) (n : nat): `&| x *+ n | = `&| x | *+ n.
+Proof. 
+  elim:n.
+    1: by rewrite ?mulr0n normr0 rmorph0. 
+  by move=> n IH; rewrite [RHS]mulrS -IH -rmorphD ?normrMn mulrS.
+Qed.
+
+Lemma rnormN (x : V) : `&| -x | = `&| x |.
+Proof. by rewrite normrE. Qed.
+
+Definition Re_normed_mixin := 
+  @Num.NormedMixin _ _ _ (fun x => `&| x |) tri rnorm0 rnorm_addn rnormN.
+
+Definition Re_normedZModType := 
+  Num.NormedZmodule.Pack (Phant R) (Num.NormedZmodule.Class Re_normed_mixin).
+
+Definition Re_Pseudometric_mixin := 
+  @pseudoMetric_of_normedDomain R (Re_normedZModType).
+
+Definition Re_pseudoMetricZmod_mixin := 
+  @PseudoMetricNormedZmodule.Mixin R Re_normedZModType _ 
+    Re_Pseudometric_mixin (ltac:(auto)).
+
+Definition Re_PseudoMetricNormedZmodule := 
+  @PseudoMetricNormedZmodule.pack _ (Phant R) V^o _
+  _ _ Re_pseudoMetricZmod_mixin Re_normedZModType _ idfun
+  
+    .
+
+  (@pack _ (Phant R) T _ _ _ m _ _ idfun _ _ idfun _ idfun).
+  @PseudoMetricNormedZmodType R Re_normedZModType Re_pseudoMetricZmod_mixin.
+
+       PseudoMetricNormedZmodule.mixin_of
+
+         (PseudoMetric.class [pseudoMetricType R of R^o])
+  @PseudoMetricNormedZmodule.Class R V^o 
+    Re_NormedZmoduleClass 
+    (Pointed.Class [pointedType of V] (pointed_mixin c)
+    Pointed.mixin  .
+
+Lemma overR : normedAlgType R.
 
 Section matrix_banach.
 Context {R: realType}.
