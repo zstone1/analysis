@@ -774,6 +774,31 @@ apply: (subclosed_compact (B := closure B)) => //.
 Qed.
 End Precompact.
   
+Ltac end_entourage_initial := 
+  match goal with 
+  | |- True /\ _ => split => //; end_entourage_initial
+  | |- (?A `<=` ?E1) /\ (?A `<=` ?E2) /\ ?P => 
+        rewrite -?subsetI -?and_assoc -?subsetI ?and_assoc;
+        end_entourage_initial
+  | |- ?P /\ (?A `<=` ?E1) /\ ?Q => 
+    suff : (A `<=` E1) /\ P /\ Q by tauto
+  | |- _ => idtac
+  end.
+Ltac pick_ent := 
+  match goal with 
+  | |- (?A `<=` ?E) /\ ?P => split; 
+    first by (refine (_ : (E `&` (E^-1)%classic) `<=` E); by move=> ? [] )
+  end.
+Ltac finish_ent :=
+  match goal with 
+  | |- (?A) = (?A^-1)%classic =>  
+    by rewrite eqEsubset; split => [][??]/= [??]; split
+  | |- entourage _ => 
+    by apply: filterI; [|apply:entourage_inv]; repeat apply: filterI 
+  end.
+Ltac end_entourage := 
+  rewrite ?and_assoc; end_entourage_initial;
+  pick_ent; repeat split; try finish_ent.
 Section Arzela.
 Context {X : topologicalType}.
 Context {Y : uniformType}.
@@ -814,55 +839,42 @@ move=> entB; apply: nbhs_comp => //=.
     by apply: entourage_split => //=; first apply: X1.
 Qed.
 
+Ltac punt_aux c := 
+  match c with 
+  | ?X /\ ?Y  => apply:proj1; punt_aux X; punt_aux Y
+  | _ => idtac
+  end.
+Ltac punt c := 
+  apply:proj2;match type of c with ?X => punt_aux X end; exact: c.
 Lemma closure_equicontinuous  (W : set ({ptws X -> Y})):
   equicontinuous W -> equicontinuous (closure W) .
 Proof.
 move=> ectsW x0 E entE.
-evar (A : set (Y * Y)); evar (cond : Prop); have punt : cond by shelve.
-rewrite /cond in punt. 
-move: (ectsW x0 A); pull1; first by ((do 1 apply: proj2; rewrite ?and_assoc); exact: punt).
+evar (A : set (Y * Y)); evar (cond : Prop); have p : cond by shelve.
+unfold A, cond in *.
+rewrite /cond in p. 
+move: (ectsW x0 A); pull1; first by rewrite/A; punt p.
 apply: filter_app; near_simpl; near=> x => Wf f cWf.
-have [g [Wg[G1 G2]]]: exists g, W g /\ A(g x, f x) /\ A(f x0, g x0). {
-  move: (cWf [set h : {ptws X -> Y} | A (h x, f x) /\ A (f x0, h x0) ]).
+have [g [Wg[G1 G2]]]: exists g, W g /\ ?A(g x, f x) /\ ?A(f x0, g x0). {
+  move: (cWf [set h : {ptws X -> Y} | A (h x, f x) /\ A (f x0, h x0) ]); unfold A.
   case; first apply: filterI. 
-  - rewrite ( _: A = (A^-1)%classic ); first exact: nbhs_entourage_ptws. 
-    (do 2 apply: proj2; rewrite ?and_assoc). exact: punt.
+  - rewrite ( _: ?A = ((?A)^-1)%classic ); first exact: nbhs_entourage_ptws. 
+    punt p.
   - exact: nbhs_entourage_ptws.
   - by move=> ? [? [? ?]]; eexists; eauto.
 }
 apply: entourage_split => //; first apply: entourage_split => //.
-- apply: ( _: A `<=` _); first shelve; last exact: G2.
-- apply: ( _: A `<=` _); first shelve; last exact: (Wf g Wg).
-- apply: ( _: A `<=` _); first shelve; last exact: G1.
-Unshelve. 
-- exact: (split_ent (split_ent)
-
-
-near_simpl; near=> y => Wf f cWF.
-apply: entourage_split => //; first apply: entourage_split => //.
-- apply: nbhs_entourage_ptws.
-near (nbhs (f : {ptws X -> Y}) => g.
-
-set R := [set h : {ptws X -> Y} | B (h x, g x) /\ A (g x0, h x0) ].
-have nR: \near (f : {ptws, X -> Y}) (g : {ptws X -> Y}) R. {
-  apply: filterI => //.
-  - exact: nbhs_entourage_ptws.
-  - under eq_fun => h do
-      (rewrite (_: A (g x0, h x0) = (A^-1)%classic (h x0, g x0)); last by []).
-    by apply: nbhs_entourage_ptws; exact: entourage_inv.
-} 
-move: (cWf R nR) => [h /= [Wh [Ah Bh]]]. 
-apply: entourage_split => //; first by apply: Bh.
-apply: entourage_split => //; last by apply: Ah.
-exact: eqctsU.
-Qed.
+- apply: ( _: ?A `<=` _); first (punt p); exact: G2.
+- apply: ( _: ?A `<=` _); first (punt p); exact: (Wf g Wg).
+- apply: ( _: ?A `<=` _); first (punt p); exact: G1.
+Grab Existential Variables. 
+exact: True. end_near.  rewrite /cond; end_entourage. Qed.
 
 Lemma equicontinuous_cts (W : set (X -> Y)) f: 
   equicontinuous W -> W f -> continuous f.
 Proof. 
-  move=> ectsW Wf x; apply/cvg_entourageP => E entE.
-  case: (ectsW x _ entE) => U [nbhsU Ef]; near_simpl; near=> y.
-  by apply: Ef => //; apply (near nbhsU).
+  move=> ectsW Wf x; apply/cvg_entourageP => E entE; near_simpl.
+  by apply: filter_app (ectsW x _ entE); near=> z; apply.
 Grab Existential Variables. end_near. Qed.
 
 Lemma equicontinuous_subset (W V : set (X -> Y)): 
