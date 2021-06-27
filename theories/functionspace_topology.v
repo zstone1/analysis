@@ -860,15 +860,15 @@ Proof.
   exact: image_subset.
 Qed.
 
-Lemma compact_cvg_nbhs (f : {family compact, X -> Y}) B E: 
-  entourage E -> compact B ->
+Lemma family_cvg_nbhs fam (f : {family fam, X -> Y}) B E: 
+  entourage E -> fam B ->
   nbhs f [set q | forall x, B x -> E (f x, q x)].
 Proof.
 move=> entE cptB.
 have FNh : Filter (nbhs f) by exact: nbhs_filter f.
-case: (@fam_cvgP X Y compact (nbhs f) f FNh) => + _.
+case: (@fam_cvgP X Y fam (nbhs f) f FNh) => + _.
 pull1; first exact:cvg_id; move/(_ (fun x => `[<B x>])).
-set B' := (x in compact x). have -> : B' = B  by 
+set B' := (x in fam x). have -> : B' = B  by 
     rewrite /B' funeqE=> z; rewrite asboolE.
 pull1; first by [].
 move/restricted_cvgP/(_ _ entE).
@@ -972,15 +972,14 @@ exact: closure_equicontinuous.
 Qed.
 
 
-Lemma compact_equicontinuous (W : (set (X -> Y))) :
-  locally_compact X -> 
-  hausdorff X -> 
+Lemma compact_equicontinuous fam (W : (set (X -> Y))) :
+  (forall x:X, exists2 U, fam U & nbhs x U) -> 
   (forall f, W f -> continuous f) ->
-  @precompact [topologicalType of {family compact, X -> Y}] W -> 
+  @precompact [topologicalType of {family fam, X -> Y}] W -> 
   equicontinuous W.
 Proof.
-  move=> locCptX hsdfX ctsW cptW => x E1 entE1.  
-  case/(_ x) : locCptX => B cptB nbhsB.
+  move=> locCptX ctsW cptW => x E1 entE1.  
+  case/(_ x) : locCptX => B nbhsB cptB.
   set E2 := (split_ent E1); have entE2: entourage E2 by 
       exact: entourage_split_ent.
   set E3 := (split_ent E2); have entE3: entourage E3 by 
@@ -1002,11 +1001,11 @@ Proof.
   have E6subE5 : E6 `<=` E5 by move=>?[].
   have E7subE6 : E7 `<=` E6 by
     move=>[??] ?; apply: entourage_split => //; eauto; exact: entourage_refl.
-  set cptTop := [topologicalType of {family compact, X -> Y}].
+  set cptTop := [topologicalType of {family fam, X -> Y}].
   set R1 := fun f => [set h : cptTop | forall y, B y -> E4 (f y, h y)]^°.
   set R := fun f => @closure cptTop W `&` R1 f.
   rewrite /precompact compact_cover cover_compactE  /= in cptW.
-  move/(_ [choiceType of {family compact, X -> Y}] (@closure cptTop W) R): cptW.
+  move/(_ [choiceType of {family fam, X -> Y}] (@closure cptTop W) R): cptW.
   pull1. {
       exists R1.
       - by move=> f Wf /=; exact: open_interior.
@@ -1014,7 +1013,7 @@ Proof.
   }
   pull1. {
     move=> h Wh; exists h => //; rewrite /R/R1; split => //.
-    exact: compact_cvg_nbhs.
+    exact: family_cvg_nbhs.
   }
   move=> [D DsubW Dcovers].
   set U := \bigcap_(g in [set i | i \in D]) [set y | B y -> E4 (g x, g y)].
@@ -1022,8 +1021,8 @@ Proof.
   - apply: filterI => //; apply: filter_bigI => g Dg.
     have : (@closure cptTop W)g by rewrite -inE; apply: DsubW.
     move=> /(_ [set h | (forall x, B x -> (split_ent E5) (g x, h x)) /\ (forall x, B x -> (split_ent E5) (h x, g x))]).
-    pull1. { apply: filterI; first exact: compact_cvg_nbhs.
-      apply: (@compact_cvg_nbhs g B (((split_ent E5)^-1)%classic)) => //.
+    pull1. { apply: filterI; first exact: family_cvg_nbhs.
+      apply: (@family_cvg_nbhs fam g B (((split_ent E5)^-1)%classic)) => //.
       exact: entourage_inv.
     }
     case=> g' [Wg' [P Q]]. 
@@ -1083,3 +1082,17 @@ Qed.
 
 End Arzela.
     
+Lemma uniform_cvg_continuous  
+  {X : topologicalType} {Y : uniformType}
+  (f: nat -> X -> Y) (g : X -> Y) :
+  (forall n, continuous (f n)) -> 
+  {uniform setT, f @ \oo --> g } -> 
+  continuous g.
+Proof.
+pose W := [set f n | n in setT].
+move=> fnCts fTog.
+apply: @equicontinuous_cts _ _ _.
+- apply: equicontinuous_subset; last apply: closure_equicontinuous.
+  + admit.
+  + apply: compact_equicontinuous.
+  
