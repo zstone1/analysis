@@ -698,8 +698,8 @@ Qed.
 
 Definition equicontinuous {X : topologicalType} {V : uniformType}
   (W : set (X -> V)) :=
-  forall x (E: set (V * V)), entourage E -> exists (U : set (X)), 
-    nbhs x U /\ (forall f y, W f -> U y -> E(f x, f y)).
+  forall x (E: set (V * V)), entourage E -> 
+    \forall y \near x, (forall f, W f -> E (f x, f y)).
 
 Definition uniformlyEquicontinuous {X V : uniformType} (W : set (X -> V)):=
   forall (E: set (V * V)), entourage E -> exists (D : set (X*X)), 
@@ -723,9 +723,8 @@ Lemma evaluator_dep_continuous x: continuous (evaluator_dep x).
 Proof.
 move=> f.
 have /cvg_sup/(_ x)/cvg_image : (f --> f) by apply: cvg_id.
-set P := ( x in (x -> _) -> _).
-have P' : P. {
-  rewrite /P eqEsubset; split => y /=.
+pull1. {
+  rewrite eqEsubset; split => y /=.
   - by [].
   - move=> _; exists (xval y) => //.
     rewrite /xval; case (pselect _).
@@ -733,13 +732,13 @@ have P' : P. {
       move=> p q ; generalize (p = q);  exact: pselect.
     + by move => Q; contradict Q; apply/ asboolP.
 } 
-move/(_ P') => Ff; apply: cvg_trans; last exact: Ff.
+move=> Ff; apply: cvg_trans; last exact: Ff.
 rewrite /= /evaluator_dep=> Q /=; rewrite {1}/nbhs /=.
 move=> [W nbdW <-]; rewrite /nbhs /=.
 by (apply: filterS; last exact: nbdW) => g Wg /=; exists g. 
 Qed.
 
-Lemma hausdorff_pointwise : 
+Lemma hausdorff_product : 
   (forall x, hausdorff (K x)) -> hausdorff (@product_topologicalType X K).
 Proof.
 move=> hsdfV => p q /= clstr.
@@ -790,24 +789,23 @@ move=> ptwsPreW; set K := fun x => closure [set f x | f in W].
 set R := [set f : {ptws X -> Y} | forall x : X, K x (f x)].
 have C : compact R by apply: tychonoff => x; apply: ptwsPreW => //.
 apply: subclosed_compact.
-+ apply: closed_closure.
++ exact: closed_closure.
 + exact: C.
-+ set L := (x in _`<=` x).
-  have WsubR : W `<=` L. {
-    rewrite /R/K => f /= Wf x; rewrite /K closure_limit_point /=.
-    by left => /=; exists f; tauto.
++ have WsubR : W `<=` R. {
+    move=> f /= Wf x; rewrite /K closure_limit_point /=.
+    by left => /=; exists f.
   }
-  have cR : closed R by apply: compact_closed => //; apply: hausdorff_pointwise.
-  by rewrite closureE /= => q /=; apply; split => //.
+  have cR : closed R by apply: compact_closed; [apply: hausdorff_product|].
+  by rewrite closureE /= => q /=; apply; split.
 Qed.
   
 Lemma nbhs_entourage_ptws (f : {ptws X -> Y}) x B : 
-  entourage B -> nbhs f (fun g : {ptws X -> Y} => B (g x, f x)).
+  entourage B -> nbhs f (fun g : {ptws X -> Y} => B (f x, g x)).
 Proof.
 move=> entB; apply: nbhs_comp => //=.
 - move => t _; apply: cvg_pair => //=; first by apply: nbhs_filter.
-  + exact: evaluator_dep_continuous.
   + by apply: cvg_cst; apply: nbhs_filter.
+  + exact: evaluator_dep_continuous.
 - set C := (split_ent B); have entC: entourage C by exact: entourage_split_ent.
   have entCinv: entourage (C^-1)%classic by exact: entourage_inv.
   exists (to_set ((C^-1)%classic) (f x), to_set C (f x)) => //=.
@@ -820,11 +818,33 @@ Lemma closure_equicontinuous  (W : set ({ptws X -> Y})):
   equicontinuous W -> equicontinuous (closure W) .
 Proof.
 move=> ectsW x0 E entE.
-set A := (split_ent E); have entA: entourage A by exact: entourage_split_ent.
-set B := (split_ent A); have entB: entourage B by exact: entourage_split_ent.
-move: (ectsW x0 B entB) => [U [nbdU eqctsU]]; exists U; split => // g x cWf Ux.
+evar (A : set (Y * Y)); evar (cond : Prop); have punt : cond by shelve.
+rewrite /cond in punt. 
+move: (ectsW x0 A); pull1; first by ((do 1 apply: proj2; rewrite ?and_assoc); exact: punt).
+apply: filter_app; near_simpl; near=> x => Wf f cWf.
+have [g [Wg[G1 G2]]]: exists g, W g /\ A(g x, f x) /\ A(f x0, g x0). {
+  move: (cWf [set h : {ptws X -> Y} | A (h x, f x) /\ A (f x0, h x0) ]).
+  case; first apply: filterI. 
+  - rewrite ( _: A = (A^-1)%classic ); first exact: nbhs_entourage_ptws. 
+    (do 2 apply: proj2; rewrite ?and_assoc). exact: punt.
+  - exact: nbhs_entourage_ptws.
+  - by move=> ? [? [? ?]]; eexists; eauto.
+}
+apply: entourage_split => //; first apply: entourage_split => //.
+- apply: ( _: A `<=` _); first shelve; last exact: G2.
+- apply: ( _: A `<=` _); first shelve; last exact: (Wf g Wg).
+- apply: ( _: A `<=` _); first shelve; last exact: G1.
+Unshelve. 
+- exact: (split_ent (split_ent)
+
+
+near_simpl; near=> y => Wf f cWF.
+apply: entourage_split => //; first apply: entourage_split => //.
+- apply: nbhs_entourage_ptws.
+near (nbhs (f : {ptws X -> Y}) => g.
+
 set R := [set h : {ptws X -> Y} | B (h x, g x) /\ A (g x0, h x0) ].
-have nR: nbhs (g : {ptws X -> Y}) R. {
+have nR: \near (f : {ptws, X -> Y}) (g : {ptws X -> Y}) R. {
   apply: filterI => //.
   - exact: nbhs_entourage_ptws.
   - under eq_fun => h do
