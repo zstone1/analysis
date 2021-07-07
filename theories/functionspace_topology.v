@@ -519,6 +519,13 @@ split; first by move=> /cvg_sup + A FA; move/(_ (existT _ _ FA)).
 by move=> famFf /=; apply/cvg_sup => [[? ?] FA]; apply: famFf.
 Qed.
 
+Lemma fam_cvg1 (F : set (set (U -> V))) (f : U -> V) A :
+  Filter F -> {family [set A], F --> f} <-> {uniform A, F --> f }.
+Proof.
+move=> FF; rewrite fam_cvgP; split; first by apply.
+by move=> + ? ->; apply.
+Qed.
+
 Lemma fam_entourage_cvgP (fam : set U -> Prop) (F : set (set (U -> V))) (f : U -> V) :
   Filter F -> {family fam, F --> f} <->
   (forall (A : set U) E, fam A -> entourage E -> \near F, forall y, A y -> E (f y, F y) ).
@@ -970,13 +977,14 @@ exact: closure_equicontinuous.
 Qed.
 
 
-Lemma compact_equicontinuous fam (W : (set (X -> Y))) :
+Lemma compact_equicontinuous fam (V W : (set (X -> Y))) :
   (forall x:X, exists2 U, fam U & nbhs x U) -> 
-  (forall f, W f -> continuous f) ->
-  @precompact [topologicalType of {family fam, X -> Y}] W -> 
+  (forall f, V f -> continuous f) ->
+  (W `<=` @closure [topologicalType of {family fam, X -> Y}] V) ->
+  @compact [topologicalType of {family fam, X -> Y}] W -> 
   equicontinuous W.
 Proof.
-  move=> locCptX ctsW cptW => x E1 entE1.  
+  move=> locCptX ctsV WsubV cptW => x E1 entE1.  
   case/(_ x) : locCptX => B nbhsB cptB.
   set E2 := (split_ent E1); have entE2: entourage E2 by 
       exact: entourage_split_ent.
@@ -1001,9 +1009,9 @@ Proof.
     move=>[??] ?; apply: entourage_split => //; eauto; exact: entourage_refl.
   set cptTop := [topologicalType of {family fam, X -> Y}].
   set R1 := fun f => [set h : cptTop | forall y, B y -> E4 (f y, h y)]^°.
-  set R := fun f => @closure cptTop W `&` R1 f.
+  set R := fun f => W `&` R1 f.
   rewrite /precompact compact_cover cover_compactE  /= in cptW.
-  move/(_ [choiceType of {family fam, X -> Y}] (@closure cptTop W) R): cptW.
+  move/(_ [choiceType of {family fam, X -> Y}] W R): cptW.
   pull1. {
       exists R1.
       - by move=> f Wf /=; exact: open_interior.
@@ -1017,15 +1025,16 @@ Proof.
   set U := \bigcap_(g in [set i | i \in D]) [set y | B y -> E4 (g x, g y)].
   exists (U `&` B); split.
   - apply: filterI => //; apply: filter_bigI => g Dg.
-    have : (@closure cptTop W)g by rewrite -inE; apply: DsubW.
-    move=> /(_ [set h | (forall x, B x -> (split_ent E5) (g x, h x)) /\ (forall x, B x -> (split_ent E5) (h x, g x))]).
+    have : (@closure cptTop V) g by apply WsubV; rewrite -inE; apply: DsubW.
+    move=> /(_ [set h | (forall x, B x -> (split_ent E5) (g x, h x)) /\ 
+                          (forall x, B x -> (split_ent E5) (h x, g x))]).
     pull1. { 
       apply: filterI; first exact: family_cvg_nbhs.
       apply: (@family_cvg_nbhs _ _  (((split_ent E5)^-1)%classic)) => //.
       exact: entourage_inv.
     }
     case=> g' [Wg' [P Q]]. 
-    move/cvg_entourageP: (ctsW _ Wg' x) => /( _ (split_ent (split_ent E4))).
+    move/cvg_entourageP: (ctsV _ Wg' x) => /( _ (split_ent (split_ent E4))).
     pull1; first by []. 
     near_simpl=> G'; near=> y=> By.
     (do 2 apply: entourage_split => //).
@@ -1033,7 +1042,7 @@ Proof.
     + exact: (near G' y).
     + exact: Q. 
     + exact: entourage_refl.
-  - move=> f y Wf Uy; case: (Dcovers f); first exact: subset_closure.
+  - move=> f y Wf Uy; case: (Dcovers f) => //.
     rewrite /R/R1 => f0 f0D [_ /interior_subset /= E4f].
     apply: (entourage_split (f0 y)) => //; last by 
       apply E3subE2, E4subE3, E4f, Uy.
@@ -1073,75 +1082,89 @@ move=> lcptX hsdfX; split.
     by apply: ascoli_forward => //.
   by move=> ? ?; apply: equicontinuous_cts; eauto.
 - case=> cptWcl ctsW; split.
-  + exact: compact_equicontinuous.
-  + apply: (@pointwisePrecomact_subset _ (@closure
-      [topologicalType of {family compact, X -> Y}] W)). 
+  + apply: equicontinuous_subset; 
+      last apply (@compact_equicontinuous compact  W (closure W)).
+    * by rewrite closure_limit_point => ? ?; left.
+    * exact: lcptX.
+    * exact: ctsW. 
+    * done.
+    * exact: cptWcl.
+  + apply: (@pointwisePrecomact_subset _ (closure W)). 
     - by rewrite closure_limit_point => ??; left.
     - exact: compact_pointwisePrecompact.
 Qed.
 End Arzela.
 
-Lemma sequence_close {X : topologicalType} (f : nat -> X) (g:X) : 
-  (f @ \oo --> g) -> (precompact [set of f]).
+Lemma ultra_filterNC {T : Type} F (A : set T) : 
+  UltraFilter F -> (~ F A) <-> F (~` A).
 Proof.
-rewrite /precompact compact_ultra /= => fg F UF FcW.
-rewrite closureEcvg.
-
-(*
-rewrite compact_cover => I O k openK coverK .
-case: (coverK _ clg) => i Oi kig.
-have nbhsKi: (nbhs g (k i)). 
-  by move: (openK i Oi); rewrite openE /=; apply.
-case: (fg (k i) nbhsKi ) =>  N _ /= subKi.
-move: subKi; elim: N.
-- move=> subKi; exists (fset1 i) => //.
-    by move=> q; rewrite inE; move/eqP => ->; rewrite inE.
-  move=> h clsh; exists i => //=.
-    by rewrite in_fsetE.
-  move: clsh; rewrite closure_limit_point => [[|lmth]].
-    by case=> n _ <-; apply subKi.
-  have: close g h.
-  move=> Q /= => []; rewrite open_nbhsE => [[oQ nbhsQ]].
-  move=> P nbhsP.
-  case: (clg _ nbhsP) => R [[M _ <- ]] PfM.
-  case: (lmth _ nbhsQ) => z [zh [n _ <-]] Qfn.
-  exists (f M); split => //.
+move=> UF; split; first by case: (in_ultra_setVsetC A UF).
+have FF : Filter F by case: UF => [][].  
+move=> FnA FA; have:= @filterI _ F FF _ _  FnA FA.
+by rewrite setICl; case: UF => [[]] + _ _; apply.
+Qed.
 
 
-    move=> Q /=; rewrite nbhs_simpl.
-
-
-
-
-Search ( _ -> {fset _}).
-
-Search ({fset _}) "big".
-rewrite compact_ultra => F UF Fsetf.
-*)
-case: (pselect (F [set of f])). 
-2: {
-  move => NFw; exists g; split => //.
-  - apply: cvg_trans fg => Q [N _ subQ].
-    exists (f N); split; first by exists N.
-    by apply: subQ => //=.
-  - admit.
+Lemma sequence_compact {X : topologicalType} (f : nat -> X) (g:X) : 
+  (f @ \oo --> g) -> (compact ([set of f] `|` [set g])).
+Proof.
+move=> fg; rewrite /precompact.
+rewrite compact_ultra => F UF Fclf.
+have FF : Filter F by (case: UF => [[]]).
+have ?:closure [set of f] g.  {
+  rewrite closureEcvg; exists (f @ \oo); split;[|split].
+  - exact: fmap_proper_filter.
+  - by exists 0%nat => //= n _; exists n.
+  - by [].
 }
-case: (pselect (exists n, F [set f n])).
-- move=> [n Fn]; exists (f n); split.
-  + by apply: subset_closure; exists n.
-  + move => P /= /nbhs_singleton Pfn. 
-    apply: filterS; last by apply: Fn.
-    by move=> ? ->.
-- rewrite -forallNE => FNf.
-  exists g; split.
-  + move=> P nbhsP;  case: (fg P nbhsP) => /= n _ subP.
-    exists (f n); split; first by exists n.
-    by apply: subP => /=.
-  + apply: cvg_trans fg; rewrite /filter_of /nbhs /= => P [n _ /= subP].
-    apply: (filterS (P := f @` [set m | (n <= m)%N])).
-      by move=> t /= [m mx <-]; apply: subP.
-    clear subP; elim: n.
-    ultra_image
+case: (pselect (F --> f @ \oo)). 
+  by move=> Ff; exists g; split;[by right|]; exact: cvg_trans fg.
+case: (pselect (F [set g])). 
+  move=> Fg _; exists g; split;[by right|] => P /nbhs_singleton Pg.
+    by apply: (filterS _ Fg) => z ->.
+
+- move=> /(ultra_filterNC _ UF) Fng. have Ff : F [set of f]. {
+    have := (filterI Fng Fclf); pull1; first by (case: UF=> [[]]).
+    rewrite setIUr setICl setU0.
+    by apply: filterS => ? [].
+  }
+  move=> /existsNP [W /=] /not_implyP [[N _ subW]] FW; rewrite nbhs_simpl.
+  set ltN := f @` [set n | (n < N)%N ].
+  have : F ltN. {
+    have := in_ultra_setVsetC ltN UF => [[]] //.
+    move=> /(filterI  Ff)/(@filterS _ _ _ _ W); pull1; last by [].
+    move=> z [[]] n _ <- Nf; apply subW.
+    move: Nf; rewrite /setC /ltN /= => /forall2NP.
+    move => /(_ n) => [[]] // .
+    by move=> /negP; rewrite -leqNgt.
+  }
+  clear subW; rewrite {}/ltN => FN.
+  suff [m [nltm Fm]]: (exists m, (m < N)%N /\ F [set f m]).
+    exists (f m); split; [by(left; exists m)|]. 
+    by move=> Q /nbhs_singleton Qfm; apply: filterS Fm => h ->.
+  elim: N FN.
+  + rewrite [x in F x] (_ : _ = xpredp0).
+      by move=> Q; contradict Q; apply: filter_not_empty.
+    by rewrite eqEsubset; split => n //= [m] + _ //.
+  + move=> n Fn; case: (pselect (F [set f n])).
+    by move=> ?; exists n; split.
+    move=> /(ultra_filterNC _ UF) Fcn Fn1.
+    move: Fn; pull1; 
+    last (move=>[m [??]]; exists m; split => //; apply: ltn_trans; eauto).
+    have := (filterI Fcn Fn1); pull1; first by [].
+    apply: filterS => m /= [/=] Fm [k]; rewrite ltnS => kn ?; subst.
+    exists k => //; rewrite ltn_neqAle; apply/andP; split => //; apply/eqP.
+    by move: (Fm); rewrite /setC/set1 /=; move=> M ?; subst.
+Qed.
+
+Lemma ptws_uniform_closure {X : choiceType} {Y : uniformType} 
+    (W : set (X -> Y)) :
+  @closure [topologicalType of {uniform setT -> Y}] W `<=` 
+  @closure [topologicalType of {ptws X -> Y}] W.
+Proof.
+rewrite ?closureEcvg => f [F [PF [FW Ff]]]. 
+by exists F; (do 2 split => //); apply: ptws_uniform_cvg.
+Qed.
 
 Lemma uniform_cvg_continuous  
   {X : topologicalType} {Y : uniformType}
@@ -1150,20 +1173,19 @@ Lemma uniform_cvg_continuous
   {uniform setT, f @ \oo --> g } -> 
   continuous g.
 Proof.
-pose W := [set f n | n in setT].
-move=> fnCts fTog.
-apply: @equicontinuous_cts _ _ _.
+move=> fnCts fTog; apply: @equicontinuous_cts _ _ _.
 - apply: equicontinuous_subset; last apply: closure_equicontinuous.
-  + admit.
-  + apply: (compact_equicontinuous (fam := [set setT]) (W:=W)).
+  + apply: ptws_uniform_closure.
+  + apply: (compact_equicontinuous (fam := [set setT]) (W:=[set of f] `|` [set g]) (V:=[set of f])).
     * by move=> x; exists setT => //; exact: filterT.
     * move=> h [n _ <-]; exact: fnCts.
-    * rewrite /precompact compact_In0 => I D t /= clsdDt +.
-      case: (pselect (exists n, (\bigcap_(i in D) t i) ( f n) )).
-      
-      case: (@in_ultra_setVsetC _ _ ([set of f]) UF) => FW.
-      -- exists g; split; first admit.
-        move=> P /=.
-      Search UltraFilter.
-      
+    * move=> q []; first by rewrite closure_limit_point; left.
+      move => ->; rewrite closureEcvg /=; exists (f @ \oo).
+      split; first by apply: fmap_proper_filter .
+      split; first by (exists 0%N => // n ?; exists n).
+      rewrite fam_cvg1; move=> Q W; apply fTog; exact: W.
+    * apply: sequence_compact.
+      move: fTog; rewrite fam_cvg1; apply.
+- by rewrite closure_limit_point; left; right.
+Qed.
   
