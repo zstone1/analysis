@@ -1072,12 +1072,11 @@ Qed.
 
 Lemma arzela_ascoli (W : (set ({family compact, X -> Y}))) : 
   locally_compact X ->
-  hausdorff X ->
   (equicontinuous W /\ pointwisePrecomact W) <->
   (@precompact [topologicalType of {family compact, X -> Y}] W /\ 
     (forall f, W f -> continuous f)).
 Proof.
-move=> lcptX hsdfX; split.
+move=> lcptX; split.
 - case => ectsW /pointwisePrecompact_precompact?; split. 
     by apply: ascoli_forward => //.
   by move=> ? ?; apply: equicontinuous_cts; eauto.
