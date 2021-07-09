@@ -5084,3 +5084,103 @@ by exists X; split; [exists x | rewrite -subset0; apply/A].
 Qed.
 
 End density.
+
+Definition Subspace {X : topologicalType} (A : set X) := {x : X | x \in A} .
+
+Program Definition subspace_pointedType 
+    {X : topologicalType} (A : set X) {z} {i : infer (A z)} :=
+  (PointedType (Subspace A) z).
+Next Obligation.  rewrite in_setE; exact: Infer.  Qed.
+Arguments subspace_pointedType {X} (A) {z} {i}.
+
+Canonical subspace_pointedType.
+
+Definition inclusion
+    {X : topologicalType} (A : set X) {z} {i : infer (A z)} (a : subspace_pointedType A) : X :=
+  (@proj1_sig X (fun y => y \in A)) a.
+Arguments inclusion {X} (A) {z} {i}.
+
+Definition subspace_topologicalType 
+    {X : topologicalType} (A : set X) {z} {i : infer (A z)} :=
+  @weak_topologicalType  _ X (inclusion A).
+Arguments subspace_topologicalType {X} (A) {z} {i}.
+
+Canonical subspace_topologicalType.
+
+Notation "{  'subspace' A  }" := (@subspace_topologicalType _ A _ _).
+
+Notation "{  'subspace' A 'over' z  }" := (@subspace_topologicalType _ A z _).
+Notation "{  'subspace' A 'with' Az  }" := (@subspace_topologicalType _ A _ Az).
+
+Section Subspace .
+Context  {X : topologicalType} (A : set X) {z} {i : infer (A z)}.
+Let j := (@inclusion X A z i) : {subspace A} -> X.
+
+Lemma inclusion_injective: @injective X {subspace A} j.
+Proof.  move=> [x ?] [y ?] /=; exact: exist_congr. Qed.
+
+Hint Resolve inclusion_injective : core.
+
+Lemma inclusion_continuous: continuous j.
+Proof. exact: weak_continuous. Qed.
+
+Lemma inclusion_in ( a : {subspace A}) : A (j a).
+Proof.  by rewrite -in_setE; case: a => ? ? /=. Qed.
+
+Lemma inclusion_preimage ( B : set X): 
+  (j @^-1` B) = [set y | B (j y)]. 
+Proof. by rewrite eqEsubset; split. Qed.
+
+Lemma inclusion_preimage_image ( B : set X): 
+  j @` (j @^-1` B) = A `&` B.
+Proof.
+rewrite inclusion_preimage eqEsubset; split.
+- by move=> p [[p' /= + + <-]]; rewrite in_setE; split.
+- by move=> p [Ap Bp]; rewrite -in_setE in Ap; exists (exist _ p Ap).
+Qed.
+
+Lemma subspace_open (U : set {subspace A}):
+  open U <-> (exists (V : set X), open V /\ j @` U = A `&` V).
+Proof.
+split.
+- rewrite /open /= /wopen /= => [[ V oV <- ]]; exists V; split => //. 
+  exact: inclusion_preimage_image.
+- case=> V [] oV UAV; exists V => //; rewrite inclusion_preimage.
+  move: UAV; rewrite -inclusion_preimage_image eqEsubset /= => [[L R]].
+  rewrite eqEsubset; split => a.
+  + by move=> Vja; rewrite -(image_inj (f:=j)) //; apply: R; exists a.
+  + by move=> Ua; rewrite -(image_inj (f:=j)) //; apply: L; exists a.
+Qed.
+  
+Lemma subspace_open_nbhs (a : {subspace A}):
+  j @ open_nbhs a `=>` open_nbhs (j a).
+Proof. 
+  move=> U; rewrite open_nbhsE => [[]] oW nbhsU. 
+  split; first (apply: open_comp => // ? ?; exact: inclusion_continuous).
+  rewrite inclusion_preimage /=; exact: nbhs_singleton.
+Qed.
+
+Lemma subspace_within ( F: set(set({subspace A}))) (a : {subspace A}):
+  Filter F ->
+  F --> a <-> (within A (j @ F)) --> (j a).
+Proof. 
+move=> FF; split.
+- move=> Fa; apply: cvg_trans; first exact: cvg_within. 
+  apply: cvg_trans; last exact: inclusion_continuous.
+  by apply: cvg_app.
+- move=> AjF W /=; rewrite (nbhsE a) => [[U []]]; rewrite open_nbhsE.
+  case => /subspace_open [V [] oV jU] nbhsU ; rewrite nbhs_simpl => UW.
+  have nbhsV: (nbhs (j a) V). 
+    rewrite openE in oV; apply oV.
+    apply: ( _ : A `&` V `<=` V); first by move=> ?[].
+    by rewrite -jU; exists a => //; exact: nbhs_singleton.
+  apply: (filterS UW).
+  move: (AjF V nbhsV) => /=; rewrite nbhs_simpl. 
+  rewrite /within; near_simpl; apply: filter_app; near=> y.
+  move=>/(_ (inclusion_in y)) VY; move: jU.
+  rewrite eqEsubset => [[] _ /(_ (j y)) /=].
+  case; first (split => //; exact: inclusion_in).
+  by move=> ? ? /inclusion_injective <-.
+Grab Existential Variables. end_near. Qed.
+
+End Subspace.
