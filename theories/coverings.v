@@ -310,31 +310,33 @@ exists  [set xy | xy.1 = xy.2 \/ A xy.1 /\ A xy.2 /\ split_ent E xy].
 Qed.
 
 Next Obligation.
-rewrite funeq2E=> x U; case (pselect (A x))=> Ax.
-- rewrite subspace_nbhs_in // withinE /= propeqE; split.
-  + case => V [nbhsV UV]. rewrite nbhsP.
-    Search (nbhs_).
+pose  EA := [set xy | xy.1 = xy.2 \/ A xy.1 /\ A xy.2].
+have entEA : subspace_ent EA. {
+   exists setT; first exact: filterT.
+   by move=> [??] /= [ ->|[?] [?]];[left|right].
+}
+rewrite funeq2E=> x U; case (pselect (A x))=> Ax; rewrite propeqE; split.
+- rewrite subspace_nbhs_in // withinE /= .
+  case => V nbhsV; move:(nbhsV)=> [/nbhsP [E entE Esub] UV]. 
+  exists [set xy | xy.1 = xy.2 \/ A xy.1 /\ A xy.2 /\ E xy]. 
+    by exists E => //= [[??]] /= [->| [?[]]//]; exact: entourage_refl.
+  move=> y /= [<-|].
+  + suff : (U `&` A) x by case.
+    by rewrite UV; split => //; apply: (@nbhs_singleton X); tauto.
+  + case=> _ [Ay Ey]; suff : (U `&` A) y by case.
+    by rewrite UV; split => //; apply: Esub.
+- rewrite subspace_nbhs_in // => [[]] W [E eentE subW] subU. 
+  near=> w; apply: subU; apply: subW; right; repeat split => //=.
+    by exact: (near (withinT A (@nbhs_filter X x) )).
+  near: w.
+  by apply/nbhsP; exists E => // y /= Ey.  
+- rewrite subspace_nbhs_out //= => Ux; exists EA => //.
+  by move=> y /= [|[]] //= <-; apply: Ux.
+- rewrite subspace_nbhs_out // => [[W [W' entW' subW] subU]] ? ->. 
+  by apply: subU; apply: subW; left.
+Grab Existential Variables. end_near. Qed.
     
-
-Next Obligation.
-rewrite funeq2E => f P /=; move: (restricted_nbhs f P); rewrite -propeqE => ->.
-rewrite propeqE; split; move=> [E].
-- move=> [entE EsubP]; exists [set fg | forall y, A y -> E (fg.1 y, fg.2 y)].
-  + exists E => //.
-  + exact: EsubP.
-- move=> [E' entE' E'subE EsubP].
-  by exists E'; split => // h E'h; apply EsubP, E'subE.
-Qed.
-
-by move=> [x y]/= ->; case: H => V entV; apply; left.
-Qed.
-
-
-
-
-UniformTYpe
-Canonical subspace_topologicalType :=
-  TopologicalType (Subspace A) (subspace_topologicalMixin).
-
-End Subspace.
+Canonical subspace_uniformType :=
+  UniformType (Subspace A) subspace_uniformMixin.
+End SubspaceUniform.
 
