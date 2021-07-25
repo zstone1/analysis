@@ -51,6 +51,15 @@ move=> FF; rewrite eqEsubset; split.
   rewrite AU; split => //; exact: (near FV).
 Grab Existential Variables. end_near. Qed.
 
+Lemma fmap_within_eq {Y : topologicalType} (F: set(set X)) (f g : X -> Y) : 
+  Filter F ->
+  {in A, f =1 g} -> f @ within A F --> g @ within A F.
+Proof.
+move=> FF feq U /=; near_simpl; apply: filter_app.
+rewrite ?nbhs_simpl; near_simpl; near=> w; rewrite (feq w) // in_setE.
+exact: (near (withinT A FF ) w).
+Grab Existential Variables. end_near. Qed.
+
 End WithinExtras.
 
 Definition Subspace {X : Type} (A : set X) := X.
@@ -129,6 +138,14 @@ split.
     by rewrite nbhs_simpl /= => /nbhs_singleton ? ? ->.
 Qed.
 
+Lemma subspace_continuous_eq { Y : topologicalType} (f g : (Subspace A) -> Y):
+  {in A, f =1 g} -> continuous f -> continuous g.
+Proof.
+rewrite ?subspace_continuousP=> feq L x Ax.
+rewrite -(feq x); last by rewrite in_setE.
+by apply: cvg_trans _ (L x Ax); apply: fmap_within_eq=> ? ?; rewrite feq.
+Qed.
+
 Lemma subspace_interior (x : X) : A^° x -> nbhs x = (nbhs (x : Subspace A)).
 Proof.
 move=> Ax; move:(Ax) => /within_interior ->. 
@@ -143,6 +160,15 @@ Proof.
 by move=> Ax; rewrite {1}/nbhs /= subspace_nbhs_in // withinE /=; split.
 Qed.
 
+Definition inclusion ( x : Subspace A) : X := x.
+
+Lemma inclusion_continuous: continuous inclusion.
+Proof.
+by apply subspace_continuousP => x Ax; apply: cvg_within.
+Qed.
+
+Section SubspaceOpen.
+
 Lemma subspace_open_out (x : Subspace A) : 
   ~ A x -> open [set x].
 Proof.
@@ -151,75 +177,88 @@ rewrite nbhsE => [[U [[]]]] oU Ux Usub; suff : U = [set x] by move=> <-.
 by rewrite eqEsubset; split => // t ->.
 Qed.
 
+Lemma subspace_open_outU (U : set (Subspace A)): 
+  U `<=` ~` A -> open U.
+Proof.
+move=> Usub; rewrite (_ : U = \bigcup_(i in U) [set i]).
+- by apply: open_bigU=> ? ?; apply: subspace_open_out; exact: Usub.
+- rewrite eqEsubset; split => x.
+  + by move=> Ux; exists x => //.
+  + by case=> i ? ->.
+Qed.
+
 Lemma subspace_openT : open ( A : set (Subspace A)).
 Proof.
   move=> x Ax; rewrite subspace_nbhs_in //; apply withinT, nbhs_filter.
 Qed.
 
-Lemma subspace_closedT : closed ( A : set (Subspace A)).
-move=> t cAt; case At: (t \in A); first by rewrite -in_setE. 
-contradict cAt; rewrite /closure /=; apply/existsNP.
-exists [set t]; rewrite not_implyE; split.
-- rewrite /nbhs/= subspace_nbhs_out // => nAt.
-  by rewrite -in_setE At in nAt.
-- apply/set0P/negP/negPn/eqP; rewrite -subset0 => w [+ tw]; rewrite tw.
-  by rewrite -in_setE At.
+Lemma subspace_open_in_A (U : set (Subspace A)) : open U <-> open (U `&` A).
+Proof.
+split.
+- by move=> oU; apply: openI => //; apply: subspace_openT.
+- move=> oUA; rewrite (_ : U = (U `&` A) `|` (U `&` ~`A)).
+    by apply: openU => //; apply: subspace_open_outU => ? [].
+  by rewrite -setIUr setUCr setIT.
 Qed.
+
+Lemma subspace_closedT : closed (A : set (Subspace A)).
+Proof.
+rewrite (_ : A = ~`( ~` (A))); last by rewrite setCK.
+by apply: closedC; apply/ subspace_open_in_A; rewrite setICl; exact: open0.
+Qed.
+
+Lemma subspace_open ( U : set X) : 
+  open (U : set (Subspace A)) <-> 
+  exists V, (open (V : set X)) /\ V `&` A = U `&` A.
+Proof.
+split.
+- move=> /subspace_open_in_A oUA.
+  have oxF: (forall (x:X), (U `&` A) x -> exists V, (open_nbhs (x : X) V) /\ 
+    ((V `&` A) `<=` (U `&` A))). 
+  {
+    move=> x UAx.
+    move: (oUA _ UAx); rewrite subspace_nbhs_in; last by case UAx.
+    rewrite withinE /= => [[V [nbhsV UV]]].
+    rewrite setIC -setIA setIid [RHS]setIC in UV.
+    exists V^°; split; first rewrite open_nbhsE; first split => //.
+    - exact: open_interior.
+    - exact: nbhs_interior.
+    - by rewrite UV=> t [/interior_subset] ??; split.
+  }
+  set f := fun x => 
+    match (pselect ((U `&` A) x)) with 
+    | left e => projT1 (cid (oxF x e))
+    | right _ => set0
+    end.
+  set V := \bigcup_(x in (U `&` A)) (f x); exists V; split.
+  + apply: open_bigU => i UAi; rewrite /f.
+    case pselect => //= e; case (cid _) =>/= W.
+    rewrite open_nbhsE; tauto.
+  + rewrite eqEsubset; split.
+    * move=> t [[u]] UAu; rewrite /f /=; case pselect => //= ?.
+      by case (cid _) => //= W [] _ + ? ?; apply; split.
+    * move=> t UAt; split => //; last by case: UAt.
+      exists t => //.
+    * rewrite /f /=; case pselect => //= ?.
+      by case (cid _) => /= W; rewrite /open_nbhs; tauto.
+- case=> V [oV UV]; apply/subspace_open_in_A; rewrite -UV.
+  move=> x [Vx Ax]; rewrite subspace_nbhs_in //.
+  rewrite withinE /=; exists V; split.
+  + by move: oV; rewrite openE /interior; apply.
+  + by rewrite setIC -setIA setIid setIC.
+Qed.
+
+Lemma subspace_open_whole (U : set X) : 
+  open ( U : set X)  -> open (U : set (Subspace A)).
+Proof.  by move=> oU; apply/subspace_open; exists U; tauto. Qed.
 
 Lemma subspace_hausdorff : 
   hausdorff X -> hausdorff [topologicalType of (Subspace A)].
 Proof.
-  rewrite open_hausdorff.
-  move=> hsdfX.
-
-Definition homeomorphism {X Y : topologicalType} (A: set X) (B : set Y) f :=
-  {in A &, injective f} /\
-  f @` A = B /\
-  forall (F : set (set X)) x,
-    Filter F -> A x ->
-    ((within A F --> x) <-> (within B (f@F) --> f x))
-.
-
-Lemma fmap_id {X : Type} (F : set (set X)) :
-  id@ F = F.
-Proof. by rewrite eqEsubset; split => z /=. Qed.
-
-
-Definition homeomorphism_id {X: topologicalType} (A : set X) :
-  homeomorphism A A id.
-Proof.
-(split; first by move=> ? ?); split.
-- rewrite eqEsubset; split => //= ? /=. 
-  + by case=> ? ? <-.
-  + by move=> ?; eauto. 
-- by move=> ? ? ? ?; rewrite fmap_id.
-Qed. 
-
-Definition homeomorphic {X Y : topologicalType} (A: set X) (B : set Y) :=
-  exists f, homeomorphism A B f.
-
-Definition FiberBundle { X E F : topologicalType} (pi : E -> X) :=
-  pi @` setT = setT /\
-  forall x, exists (U: set X), open_nbhs x U /\
-    exists phi: E -> X * F, 
-      homeomorphism (pi@^-1` U) ([set xf | U (fst xf)]) phi /\
-      (forall z, fst (phi (z)) = pi z)
-      .
-
-Lemma fiber_bundle_global {X F : topologicalType} : 
-  @FiberBundle X [topologicalType of (X * F)%type] F (fst).
-Proof.
-split.
-  by rewrite eqEsubset; split => // x _; exists (x,point).
-move=> x; exists setT; split; first exact: open_nbhsT.
-exists id; split => //=.
-exact: homeomorphism_id.
+rewrite ?open_hausdorff => + x y xNy => /(_ x y xNy). 
+move=> [[P Q]] /= [Px Qx] /= [/subspace_open_whole oP /subspace_open_whole oQ].
+by move=> sdjPQ; exists (P,Q).
 Qed.
 
-Definition covering_space {X E }
-
-
-  
-
-  
-
+End SubspaceOpen.
+End Subspace.
