@@ -41,13 +41,13 @@ Qed.
 
 Lemma withinE F: 
   Filter F ->
-  within A F = [set U | (exists V, F V /\ A `&` U = A `&` V)].
+  within A F = [set U | (exists V, F V /\ U `&` A = V `&` A)].
 Proof.
 move=> FF; rewrite eqEsubset; split.
 - move=> U Wu; exists ([set x | A x -> U x]); split => //.
-  rewrite eqEsubset; split => t [L R]; split => //; exact: R.
+  rewrite eqEsubset; split => t [L R]; split => //; exact: L.
 - move=> U [V [FV AU]]; rewrite /within /prop_near1 nbhs_simpl; near=> w => Aw.
-  suff : (A `&` U) w by case. 
+  suff : (U `&` A) w by case. 
   rewrite AU; split => //; exact: (near FV).
 Grab Existential Variables. end_near. Qed.
 
@@ -155,7 +155,7 @@ Qed.
 Lemma subspace_nbhsP (U : set X) (x : X) : 
   A x ->
   nbhs (x : Subspace A) (U) <->
-  (exists V, nbhs (x : X) (V) /\ A `&` U = A `&` V).
+  (exists V, nbhs (x : X) (V) /\ U `&` A = V `&` A).
 Proof.
 by move=> Ax; rewrite {1}/nbhs /= subspace_nbhs_in // withinE /=; split.
 Qed.
@@ -219,7 +219,7 @@ split.
     move=> x UAx.
     move: (oUA _ UAx); rewrite subspace_nbhs_in; last by case UAx.
     rewrite withinE /= => [[V [nbhsV UV]]].
-    rewrite setIC -setIA setIid [RHS]setIC in UV.
+    rewrite -setIA setIid in UV.
     exists V^°; split; first rewrite open_nbhsE; first split => //.
     - exact: open_interior.
     - exact: nbhs_interior.
@@ -245,7 +245,7 @@ split.
   move=> x [Vx Ax]; rewrite subspace_nbhs_in //.
   rewrite withinE /=; exists V; split.
   + by move: oV; rewrite openE /interior; apply.
-  + by rewrite setIC -setIA setIid setIC.
+  + by rewrite -setIA setIid.
 Qed.
 
 Lemma subspace_open_whole (U : set X) : 
@@ -262,3 +262,79 @@ Qed.
 
 End SubspaceOpen.
 End Subspace.
+
+Section SubspaceUniform.
+Local Notation "A ^-1" := ([set xy | A (xy.2, xy.1)]) : classical_set_scope.
+Context {X : uniformType} (A : set X).
+
+Definition subspace_ent := 
+  filter_from (@entourage X)
+  (fun E => [set xy | (xy.1 = xy.2) \/ (A xy.1 /\ A xy.2 /\ E xy)]).
+
+Program Definition subspace_uniformMixin :=
+  @Uniform.Mixin 
+    (Subspace A) 
+    (fun x => subspace_nbhs x) 
+    (subspace_ent)
+    _ _ _ _ _.
+
+Next Obligation.
+apply: filter_from_filter; first by (exists setT; exact: filterT).
+move=> P Q entP entQ; exists (P `&` Q); first exact: filterI.
+move=> [x y] /=; case; first (by move=> ->; split=> /=; left).
+by move=> [Ax [Ay [Pxy Qxy]]]; split=> /=; right; tauto.
+Qed.
+
+Next Obligation.
+by move=> [x y]/= ->; case: H => V entV; apply; left.
+Qed.
+
+Next Obligation.
+case: H => V entV Vsub; exists (V^-1)%classic; first exact: entourage_inv.
+move=> [x y] /= G; apply: Vsub; case G; first by (move=> <-; left).
+move=> [? [? Vxy]]; right; repeat split => //.
+Qed.
+
+Next Obligation.
+case: H => E entE Esub. 
+exists  [set xy | xy.1 = xy.2 \/ A xy.1 /\ A xy.2 /\ split_ent E xy].
+- by exists (split_ent E).
+- move=> [x y] [z /= Ez zE] /=; case: Ez; case: zE.
+  + by move=> -> ->; apply Esub; left.
+  + move=> [ ? []] ? G xy; subst; apply Esub; right; repeat split => //=.
+    apply: entourage_split => //=; first exact: G; exact: entourage_refl.
+  + move=> -> [ ? []] ? G; apply Esub; right; repeat split => //=.
+    apply: entourage_split => //=; first exact: G; exact: entourage_refl.
+  + move=> []? []? ?[]?[]??; apply Esub; right; repeat split => //=.
+    by apply: subset_split_ent => //; exists z.
+Qed.
+
+Next Obligation.
+rewrite funeq2E=> x U; case (pselect (A x))=> Ax.
+- rewrite subspace_nbhs_in // withinE /= propeqE; split.
+  + case => V [nbhsV UV]. rewrite nbhsP.
+    Search (nbhs_).
+    
+
+Next Obligation.
+rewrite funeq2E => f P /=; move: (restricted_nbhs f P); rewrite -propeqE => ->.
+rewrite propeqE; split; move=> [E].
+- move=> [entE EsubP]; exists [set fg | forall y, A y -> E (fg.1 y, fg.2 y)].
+  + exists E => //.
+  + exact: EsubP.
+- move=> [E' entE' E'subE EsubP].
+  by exists E'; split => // h E'h; apply EsubP, E'subE.
+Qed.
+
+by move=> [x y]/= ->; case: H => V entV; apply; left.
+Qed.
+
+
+
+
+UniformTYpe
+Canonical subspace_topologicalType :=
+  TopologicalType (Subspace A) (subspace_topologicalMixin).
+
+End Subspace.
+
