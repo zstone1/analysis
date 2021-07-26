@@ -340,3 +340,54 @@ Canonical subspace_uniformType :=
   UniformType (Subspace A) subspace_uniformMixin.
 End SubspaceUniform.
 
+Section SubspacePseudoMetric.
+Context {R : numDomainType} {X : pseudoMetricType R} (A : set X).
+
+Definition subspace_ball (x : Subspace A) (r : R) :=
+  if (x \in A) then A `&` ball (x : X) r else [set x].
+
+Program Definition subspace_pseudoMetricType_mixin :=
+  @PseudoMetric.Mixin R (Subspace A) (subspace_ent A) (subspace_ball)
+  _ _ _ _.
+Next Obligation.
+rewrite /subspace_ball; case Ax: (x \in A) => //; split. 
+- by rewrite -in_setE.
+- exact: ballxx.
+Qed.
+
+Next Obligation.
+move: H; rewrite /subspace_ball; (case Ax: (x \in A)).
+- move=> [] Ay /ball_sym yBx; rewrite -in_setE in Ay; rewrite Ay.
+  by split => //; rewrite -in_setE.
+- by move=> ->; rewrite Ax.
+Qed.
+Next Obligation.
+move: H H0; rewrite /subspace_ball; case Ax: (x \in A); case Ay: (y \in A).
+- move=> [] ? xBy []Az yBz; split => //.
+  by apply: ball_triangle; eauto.
+- by move=> []; rewrite -in_setE Ay.
+- by move => xy; move: xy Ax => <-; rewrite Ay.
+- by move=> -> ->.
+Qed.
+Next Obligation.
+rewrite eqEsubset; split.
+- move=> U [W + subU]; rewrite -entourage_ballE => [[eps] nneg subW].
+  exists eps => //; apply: (subset_trans _ subU).
+  move=> [x y] /=; rewrite /subspace_ball; case Ax: (x \in A).
+  + move=> [Ay xBy]; right; repeat split => //.
+      by rewrite -in_setE.
+    exact: subW.
+  + by move=> ->; left.
+- move=> E [eps nneg subE]; exists [set xy | ball (xy.1 : X) eps xy.2].
+    by rewrite -entourage_ballE; exists eps.
+  move=> [x y] /= [->|[]Ax []Ay xBy]; apply: subE.
+  + rewrite /subspace_ball //=; case Ay: (y \in A) => //=; split.
+      by rewrite -in_setE.
+      exact: ballxx.
+  + by rewrite /subspace_ball /=; rewrite -in_setE in Ax; rewrite Ax; split.
+Qed.
+
+Canonical subspace_pseudoMetricType :=
+  PseudoMetricType (Subspace A)  subspace_pseudoMetricType_mixin.
+
+End SubspacePseudoMetric.
