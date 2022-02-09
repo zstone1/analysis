@@ -5767,7 +5767,7 @@ Definition equicontinuous
   forall x (E: set (Y * Y)), entourage E -> exists (U : set (X)), 
     nbhs x U /\ (forall f y, W f -> U y -> E(f x, f y)).
 
-Lemma equicontinuous_subset (W V : set (X -> Y)): 
+Lemma equicontinuous_subset (W V : set (X -> Y)) : 
   W `<=` V -> equicontinuous V -> equicontinuous W.
 Proof. 
 move=> WsubV + x E entE => /(_ x E entE) [U [? Ef]].
