@@ -5807,9 +5807,8 @@ rewrite closureE => q; apply; split => //; apply: compact_closed=> //.
 exact: hausdorff_product.
 Qed.
 
-Lemma uniform_pointwise_compact (W : set(X -> Y)): 
-  @compact [topologicalType of {family compact, X -> Y}] W -> 
-  @compact [topologicalType of {ptws X -> Y}] W.
+Lemma uniform_pointwise_compact (W : set (X -> Y)): 
+  compact (W : {family compact, X -> Y}) -> compact (W : {ptws X -> Y}).
 Proof.
 rewrite [x in x _ -> _]compact_ultra [x in _ -> x _]compact_ultra. 
 move=> + F UF FW => /(_ F UF FW) [h [Wh Fh]]; exists h; split => //.
