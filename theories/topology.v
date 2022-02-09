@@ -1,6 +1,6 @@
 (* mathcomp analysis (c) 2017 Inria and AIST. License: CeCILL-C.              *)
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice div.
-From mathcomp Require Import seq fintype bigop order interval ssralg ssrnum rat.
+From mathcomp Require Import seq fintype finset bigop order interval ssralg ssrnum rat.
 From mathcomp Require Import matrix finmap.
 Require Import boolp reals classical_sets posnum.
 
@@ -5206,7 +5206,7 @@ Lemma ptws_uniform_cvg  (f : U -> V) (F : set (set (U -> V))) :
   Filter F -> {uniform, F --> f} -> {ptws, F --> f}.
 Proof.
 move=> FF; rewrite cvg_sup => + i; have isubT : [set i] `<=` setT by move=> ?.
-move=> /(uniform_subset_cvg _ isubT); rewrite /ptws_fun uniform_singleton.
+move=> /(uniform_subset_cvg _ isubT); rewrite /ptws_fun uniform_set1.
 rewrite cvg_image; last by rewrite eqEsubset; split=> v // _; exists (cst v).
 apply: cvg_trans => W /=; rewrite nbhs_simpl; eexists; eauto.
 by rewrite image_preimage // eqEsubset; split=> // j _; exists (fun _ => j).
@@ -5705,22 +5705,21 @@ Canonical subspace_pseudoMetricType :=
 
 End SubspacePseudoMetric.
 
+Definition singletons {X : Type} := [set [set x] | x in @setT X].
+
 Section UniformPointwise.
-
 Context {U : topologicalType} {V : uniformType}.
-
-Definition singletons {X : Type} := [set [set x] | x in [set: X]].
 
 Lemma ptws_cvg_family_singleton F (f: U -> V):
   Filter F -> {ptws, F --> f} = {family @singletons U, F --> f}.
 Proof.
 move=> FF; rewrite propeqE fam_cvgP cvg_sup /ptws_fun; split.
-  move=> + A [x ->] => /(_ x); rewrite uniform_singleton.
+  move=> + A [x _ <-] => /(_ x); rewrite uniform_set1.
   rewrite cvg_image; last by rewrite eqEsubset; split=> v // _; exists (cst v).
   apply: cvg_trans => W /=; rewrite ?nbhs_simpl /fmap /= => [[W' + <-]]. 
   by apply: filterS=> g W'g /=; eexists; eauto.
 move=> + i; (have Si : singletons [set i] by exists i) => /(_ [set i] Si).
-rewrite uniform_singleton. 
+rewrite uniform_set1. 
 rewrite cvg_image; last by rewrite eqEsubset; split=> v // _; exists (cst v).
 move=> + W //=; rewrite ?nbhs_simpl => Q => /Q Q'; eexists; eauto.
 rewrite eqEsubset; split => j; first by case=> ? + <-.
@@ -5731,7 +5730,7 @@ Lemma ptws_cvg_compact_family F (f : U -> V):
   ProperFilter F -> {family compact, F --> f} -> {ptws, F --> f}.
 Proof.
 move=> PF; rewrite ptws_cvg_family_singleton; apply: family_cvg_subset.
-move=> A [x ->]; apply: compact_singleton.
+move=> A [x _ <-]; apply: compact_set1.
 Qed.
 End UniformPointwise.
 
@@ -5762,40 +5761,38 @@ Context {hsdf : hausdorff_space Y}.
 (* The key condition in Arzela-Ascoli that, like uniform continuity,
    moves a quantifier around so all functions have the same 'deltas' *)
 
-Definition equicontinuous
-  (W : set (X -> Y)) :=
-  forall x (E: set (Y * Y)), entourage E -> exists (U : set (X)), 
-    nbhs x U /\ (forall f y, W f -> U y -> E(f x, f y)).
+Definition equicontinuous (W : set (X -> Y)) :=
+  forall x (E: set (Y * Y)), entourage E -> 
+    \forall y \near x, forall f, W f -> E(f x, f y).
 
 Lemma equicontinuous_subset (W V : set (X -> Y)) : 
   W `<=` V -> equicontinuous V -> equicontinuous W.
 Proof. 
-move=> WsubV + x E entE => /(_ x E entE) [U [? Ef]].
-by exists U; split => // f y Wy Uy; apply Ef => //; apply WsubV.
+move=> WsubV + x E entE => /(_ x E entE); apply: filter_app; apply:nearW.
+by move=> ? Vf ? /WsubV; exact: Vf.
 Qed.
 
 Lemma equicontinuous_cts (W : set (X -> Y)) f: 
   equicontinuous W -> W f -> continuous f.
 Proof. 
-  move=> ectsW Wf x; apply/cvg_entourageP => E entE.
-  case: (ectsW x _ entE) => U [nbhsU Ef]; near_simpl; near=> y.
-  by apply: Ef => //; apply (near nbhsU).
-Unshelve. all: end_near. Qed.
+move=> ectsW Wf x; apply/cvg_entourageP => E entE; near_simpl; 
+by move: (ectsW x _ entE); apply: filter_app; apply: nearW=> ?; apply.
+Qed.
 
 (* A convienet notion that is in between compactness in 
    {family compact, X -> y} and compactness in {ptws X -> y}.*)
-Definition pointwisePrecompact (W : set (X -> Y)):=
+Definition pointwise_precompact (W : set (X -> Y)):=
   forall x, precompact [set (f x) | f in W].
 
-Lemma pointwisePrecomact_subset (W V : set (X -> Y)): 
-  W `<=` V -> pointwisePrecompact V -> pointwisePrecompact W.
+Lemma pointwise_precomact_subset (W V : set (X -> Y)): 
+  W `<=` V -> pointwise_precompact V -> pointwise_precompact W.
 Proof. 
 move=> WsubV + x => /(_ x) pcptV. 
 by apply: precompact_subset; last exact: pcptV; exact: image_subset.
 Qed.
 
-Lemma pointwisePrecompact_precompact (W : set {ptws X -> Y}):
-  pointwisePrecompact W -> precompact W.
+Lemma pointwise_precompact_precompact (W : set {ptws X -> Y}):
+  pointwise_precompact W -> precompact W.
 Proof.
 move=> ptwsPreW; set K := fun x => closure [set f x | f in W].
 set R := [set f : {ptws X -> Y} | forall x : X, K x (f x)].
@@ -5808,16 +5805,17 @@ exact: hausdorff_product.
 Qed.
 
 Lemma uniform_pointwise_compact (W : set (X -> Y)): 
-  compact (W : {family compact, X -> Y}) -> compact (W : {ptws X -> Y}).
+  compact (W : set (@fct_UniformFamily X Y compact)) -> 
+  compact (W : set {ptws X -> Y}).
 Proof.
 rewrite [x in x _ -> _]compact_ultra [x in _ -> x _]compact_ultra. 
 move=> + F UF FW => /(_ F UF FW) [h [Wh Fh]]; exists h; split => //.
 by move=> /= Q Fq; apply: ptws_cvg_compact_family; first exact: Fh.
 Qed.
 
-Lemma compact_pointwisePrecompact (W : set(X -> Y)): 
-  @compact [topologicalType of {family compact, X -> Y}] W -> 
-  pointwisePrecompact W.
+Lemma compact_pointwise_precompact (W : set(X -> Y)): 
+  compact (W : set {family compact, X -> Y}) -> 
+  pointwise_precompact W.
 Proof.
 move=> cptFamW x; pose V : set Y := prod_topo_apply x @` W.
 rewrite/precompact (_ : [set f x | f in W] = V ) //.
