@@ -5794,7 +5794,7 @@ move=> WsubV + x => /(_ x) pcptV.
 by apply: precompact_subset; last exact: pcptV; exact: image_subset.
 Qed.
 
-Lemma pointwisePrecompact_precompact  (W : set ({ptws X -> Y})):
+Lemma pointwisePrecompact_precompact (W : set {ptws X -> Y}):
   pointwisePrecompact W -> precompact W.
 Proof.
 move=> ptwsPreW; set K := fun x => closure [set f x | f in W].
