@@ -2902,7 +2902,8 @@ Context {X : topologicalType}.
 
 (* The closed condition here is neccessary to make this definition work in a  *)
 (* non-hausdorff setting.                                                     *)
-Definition compact_near (F : set (set X)) := exists2 U, F U & compact U /\ closed U.
+Definition compact_near (F : set (set X)) := 
+  exists2 U, F U & compact U /\ closed U.
 
 Definition precompact (C : set X) := compact_near (globally C).
 
@@ -2917,12 +2918,12 @@ move=> [B CsubB [cptB cB]]; apply: (subclosed_compact _ cptB).
 by move/closure_id: cB => ->; exact: closure_subset.
 Qed.
 
-Lemma precompact_subset (A B: set X) : A `<=` B -> precompact B -> precompact A.
+Lemma precompact_subset (A B : set X) : A `<=` B -> precompact B -> precompact A.
 Proof.
 by move=> AsubB [B' B'subB cptB']; exists B' => // ? ?; apply/B'subB/AsubB.
 Qed.
 
-Lemma compact_precompact (A B: set X) : 
+Lemma compact_precompact (A B : set X) : 
   hausdorff_space X -> compact A -> precompact A.
 Proof.
 move=> h c; rewrite (@precompactE _) ( _ : closure A = A) //; symmetry. 
