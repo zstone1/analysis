@@ -208,6 +208,12 @@ Require Import boolp reals classical_sets posnum.
 (*                        cluster F == set of cluster points of F.            *)
 (*                          compact == set of compact sets w.r.t. the filter- *)
 (*                                     based definition of compactness.       *)
+(*                   compact_near F == the filter F contains a closed comapct *)
+(*                                     set                                    *)
+(*                     precompact A == The set A is contained in a closed and *)
+(*                                     compact set                            *)
+(*                locally_compact A == every point in A has a compact         *)
+(*                                     (and closed) neighborhood              *)
 (*               hausdorff_space T <-> T is a Hausdorff space (T_2).          *)
 (*              prod_topo_apply x f == application of f to x, f being in a    *)
 (*                                     product topology of a family K         *)
@@ -331,6 +337,11 @@ Require Import boolp reals classical_sets posnum.
 (*                               a topology that ignores points outside A     *)
 (*            incl_subspace x == with x of type subspace A with (A : set T),  *)
 (*                               inclusion of subspace A into T               *)
+(*                                                                            *)
+(* * Arzela Ascoli' theorem :                                                 *)
+(*  equicontinuous W x     == the set (W : X -> Y) is equicontinuous at x     *)
+(*  pointwise_precompact W == For each (x : X), set of images [f x | f in W]  *)
+(*                            is precompact                                   *)
 (*                                                                            *)
 (* We endow several standard types with the types of topological notions:     *)
 (* - products: prod_topologicalType, prod_uniformType, prod_pseudoMetricType  *)
@@ -2884,6 +2895,50 @@ by apply/cvg_sup => i; apply/cvg_image=> //; have /getPex [] := cvpFA i.
 Qed.
 
 End Tychonoff.
+
+Section Precompact.
+
+Context {X : topologicalType}.
+
+(* The closed condition here is neccessary to make this definition work in a  *)
+(* non-hausdorff setting.                                                     *)
+Definition compact_near (F : set (set X)) := exists2 U, F U & compact U /\ closed U.
+
+Definition precompact (C : set X) := compact_near (globally C).
+
+Lemma precompactP (C : set X) : 
+  precompact C = compact (closure C).
+Proof.
+rewrite propeqE; split; last first.
+  move=> clC; (exists (closure C) => //); first exact: subset_closure.
+  by split => //; apply: closed_closure.
+move=> [B CsubB [cptB cB]]; apply: (subclosed_compact _ cptB). 
+  exact: closed_closure.
+by move/closure_id: cB => ->; exact: closure_subset.
+Qed.
+
+Lemma precompact_subset (A B: set X) : A `<=` B -> precompact B -> precompact A.
+Proof.
+by move=> AsubB [B' B'subB cptB']; exists B' => // ? ?; apply/B'subB/AsubB.
+Qed.
+
+Lemma compact_precompact (A B: set X) : 
+  hausdorff_space X -> compact A -> precompact A.
+Proof.
+move=> h c; rewrite (@precompactP _) ( _ : closure A = A) //; symmetry. 
+by apply/closure_id; exact : (compact_closed h c).
+Qed.
+
+Lemma precompact_closed (A : set X) : closed A -> precompact A = compact A.
+Proof.
+move=> clA; rewrite propeqE; split.
+  by move=> [B AsubB [ + _ ]] => /subclosed_compact; apply => //?.
+by rewrite {1}(_ : A = closure A) ?precompactP // -closure_id. 
+Qed.
+
+Definition locally_compact (A : set X) := [locally precompact A]. 
+
+End Precompact.
 
 Section Product_Hausdorff.
 Context {X : choiceType} {K : X -> topologicalType}.
@@ -5734,26 +5789,8 @@ move=> A [x _ <-]; apply: compact_set1.
 Qed.
 End UniformPointwise.
 
-Section Precompact.
 
-Context {X : topologicalType}.
-
-Definition locally_compact := forall (x:X), exists2 U, compact U & nbhs x U.
-
-Definition precompact (C : set X) := compact (closure C).
-
-Lemma precompact_subset (A B: set X) : A `<=` B -> precompact B -> precompact A.
-Proof.
-move=> AsubB precompactB.
-apply: (subclosed_compact (B := closure B)).
-- exact: closed_closure.
-- exact: precompactB.
-- exact: closure_subset.
-Qed.
-
-End Precompact.
-
-Section Arzela.
+Section ArzelaAscoli.
 Context {X : topologicalType}.
 Context {Y : uniformType}.
 Context {hsdf : hausdorff_space Y}.
@@ -5794,12 +5831,13 @@ Qed.
 Lemma pointwise_precompact_precompact (W : set {ptws X -> Y}):
   pointwise_precompact W -> precompact W.
 Proof.
-move=> ptwsPreW; set K := fun x => closure [set f x | f in W].
+rewrite precompactP => ptwsPreW; set K := fun x => closure [set f x | f in W].
 set R := [set f : {ptws X -> Y} | forall x : X, K x (f x)].
-have C : compact R by apply: tychonoff => x; apply: ptwsPreW.
+have C : compact R.  
+  by apply: tychonoff => x; rewrite -precompactP; apply: ptwsPreW.
 apply: (subclosed_compact _ C); first exact: closed_closure.
 have WsubR : W `<=` R.
-  move=> f Wf x; rewrite /R/K closure_limit_point; by left; exists f; tauto.
+  by move=> f Wf x; rewrite /R/K closure_limit_point; by left; exists f; tauto.
 rewrite closureE => q; apply; split => //; apply: compact_closed=> //.
 exact: hausdorff_product.
 Qed.
@@ -5818,11 +5856,11 @@ Lemma compact_pointwise_precompact (W : set(X -> Y)):
   pointwise_precompact W.
 Proof.
 move=> cptFamW x; pose V : set Y := prod_topo_apply x @` W.
-rewrite/precompact (_ : [set f x | f in W] = V ) //.
+rewrite precompactP (_ : [set f x | f in W] = V ) //.
 suff: (compact V) by move=> /[dup]/(compact_closed hsdf)/closure_id <-.
 apply: (continuous_compact (f := prod_topo_apply x)); first move=> y ?.
   by exact: prod_topo_apply_continuous.
 exact: uniform_pointwise_compact.
 Qed.
 
-End Arzela.
+End ArzelaAscoli.
