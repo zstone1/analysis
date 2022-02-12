@@ -1,6 +1,6 @@
 (* mathcomp analysis (c) 2017 Inria and AIST. License: CeCILL-C.              *)
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype choice div.
-From mathcomp Require Import seq fintype finset bigop order interval ssralg ssrnum rat.
+From mathcomp Require Import seq fintype bigop order interval ssralg ssrnum rat.
 From mathcomp Require Import matrix finmap.
 Require Import boolp reals classical_sets posnum.
 
