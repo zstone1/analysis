@@ -2906,7 +2906,7 @@ Definition compact_near (F : set (set X)) := exists2 U, F U & compact U /\ close
 
 Definition precompact (C : set X) := compact_near (globally C).
 
-Lemma precompactP (C : set X) : 
+Lemma precompactE (C : set X) : 
   precompact C = compact (closure C).
 Proof.
 rewrite propeqE; split; last first.
@@ -2925,7 +2925,7 @@ Qed.
 Lemma compact_precompact (A B: set X) : 
   hausdorff_space X -> compact A -> precompact A.
 Proof.
-move=> h c; rewrite (@precompactP _) ( _ : closure A = A) //; symmetry. 
+move=> h c; rewrite (@precompactE _) ( _ : closure A = A) //; symmetry. 
 by apply/closure_id; exact : (compact_closed h c).
 Qed.
 
@@ -2933,7 +2933,7 @@ Lemma precompact_closed (A : set X) : closed A -> precompact A = compact A.
 Proof.
 move=> clA; rewrite propeqE; split.
   by move=> [B AsubB [ + _ ]] => /subclosed_compact; apply => //?.
-by rewrite {1}(_ : A = closure A) ?precompactP // -closure_id. 
+by rewrite {1}(_ : A = closure A) ?precompactE // -closure_id. 
 Qed.
 
 Definition locally_compact (A : set X) := [locally precompact A]. 
@@ -5831,10 +5831,10 @@ Qed.
 Lemma pointwise_precompact_precompact (W : set {ptws X -> Y}):
   pointwise_precompact W -> precompact W.
 Proof.
-rewrite precompactP => ptwsPreW; set K := fun x => closure [set f x | f in W].
+rewrite precompactE => ptwsPreW; set K := fun x => closure [set f x | f in W].
 set R := [set f : {ptws X -> Y} | forall x : X, K x (f x)].
 have C : compact R.  
-  by apply: tychonoff => x; rewrite -precompactP; apply: ptwsPreW.
+  by apply: tychonoff => x; rewrite -precompactE; apply: ptwsPreW.
 apply: (subclosed_compact _ C); first exact: closed_closure.
 have WsubR : W `<=` R.
   by move=> f Wf x; rewrite /R/K closure_limit_point; by left; exists f; tauto.
@@ -5856,7 +5856,7 @@ Lemma compact_pointwise_precompact (W : set(X -> Y)):
   pointwise_precompact W.
 Proof.
 move=> cptFamW x; pose V : set Y := prod_topo_apply x @` W.
-rewrite precompactP (_ : [set f x | f in W] = V ) //.
+rewrite precompactE (_ : [set f x | f in W] = V ) //.
 suff: (compact V) by move=> /[dup]/(compact_closed hsdf)/closure_id <-.
 apply: (continuous_compact (f := prod_topo_apply x)); first move=> y ?.
   by exact: prod_topo_apply_continuous.
