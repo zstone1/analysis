@@ -3608,6 +3608,7 @@ End uniformType1.
 
 Hint Extern 0 (entourage (split_ent _)) => exact: entourage_split_ent : core.
 Hint Extern 0 (entourage (get _)) => exact: entourage_split_ent : core.
+Hint Extern 0 (entourage (_^-1)%classic) => exact: entourage_inv : core.
 Arguments entourage_split {M} z {x y A}.
 Hint Extern 0 (nbhs _ (to_set _ _)) => exact: nbhs_entourage : core.
 
@@ -4490,7 +4491,6 @@ apply/cvg_fct_entourageP => A entA; near=> f => t; near F => g.
 apply: (entourage_split (g t)) => //; first by near: g; apply: cvF.
 move: (t); near: g; near: f; apply: nearP_dep; apply: Fc.
 exists ((split_ent A)^-1)%classic=> //=.
-by apply: entourage_inv; apply: entourage_split_ent.
 Unshelve. all: by end_near. Qed.
 
 Canonical fun_completeType := CompleteType (T -> U) fun_complete.
@@ -5790,6 +5790,9 @@ move=> A [x _ <-]; apply: compact_set1.
 Qed.
 End UniformPointwise.
 
+Lemma entourage_sym {X Y : Type} E (x:X) (y:Y) : 
+  E (x, y) <-> (E^-1)%classic (y, x).
+Proof.  by [].  Qed.
 
 Section ArzelaAscoli.
 Context {X : topologicalType}.
@@ -5864,4 +5867,84 @@ apply: (continuous_compact (f := prod_topo_apply x)); first move=> y ?.
 exact: uniform_pointwise_compact.
 Qed.
 
+Lemma ptws_cvg_entourage (x : X) (f : {ptws X -> Y}) E : 
+  entourage E -> \forall g \near f, E (f x, g x).
+Proof.
+move=> entE; have : ({ptws, nbhs f --> f}) by [].
+rewrite ptws_cvg_family_singleton => /fam_cvgP /(_ [set x] (ltac:(by exists x))). 
+rewrite uniform_set1 => /(_ (to_set E (f x))) /=; near_simpl; apply.
+by move: E entE; apply/cvg_entourageP.
+Qed.
+
+Lemma equicontinuous_closure (W : set {ptws X -> Y}) : 
+  equicontinuous W -> equicontinuous (closure W).
+Proof.
+move=> ectsW => x E entE; near=> y => f clWf. 
+near (within W (nbhs (f : {ptws X -> Y}))) => g.
+near:g; rewrite near_withinE; near_simpl; near=> g => Wg. 
+apply: (@entourage_split _ (g x)) => //. 
+  by apply: (near (@ptws_cvg_entourage _ _ _ _)).
+apply: (@entourage_split _ (g y)) => //; first last.
+  by apply/entourage_sym; apply: (near (@ptws_cvg_entourage _ _ _ _)).
+by apply: ((near (@ectsW x _ _)) y). 
+Unshelve. all: by end_near. Qed.
+
+Hint Extern 0 (entourage (_ `&` _)) => exact: filterI : core.
+
+Lemma ptws_compact_cvg (W : set ({ptws X -> Y})) F f:
+  equicontinuous W -> 
+  ProperFilter F ->
+  F W -> 
+  W f ->
+  {ptws, F --> f} <-> {family compact, F --> f}.
+Proof.
+move=> ectsW FF FW Wf; split; last exact: ptws_cvg_compact_family.
+move=> ptwsF; apply/fam_cvgP=> K cptK. 
+have [->|/set0P [k0 Kk0]] := eqVneq K set0; first exact: cvg_uniform_set0.
+rewrite /uniform_fun => U /=; rewrite uniform_nbhs => [[E [entE EsubU]]]. 
+suff : within W (nbhs F) U.
+  by rewrite/within nbhs_simpl => wwF; apply: (filter_app2 _ _ wwF FW); apply: nearW.
+apply: (filterS EsubU); apply: ptwsF; rewrite /ptws_fun /=.
+suff : within W (nbhs f) [set g | forall y, K y -> E (f y, g y)] by [].
+
+set small := fun U => 
+  K `\` [set y : X | K y /\ forall g, U g -> E (f y, g y)].
+
+(* G is a filter that lets us target `bad` points that break convergence*)
+set G := filter_from (within W (nbhs (f : {ptws X -> Y}))) small.
+have FG: Filter G. 
+  apply: filter_from_filter; first by (exists setT; apply: filterT).
+  move=> P Q fP fQ; exists (P `&` Q); first exact: filterI.
+  rewrite /small /= !setDIr !setDv !set0U -setDUr; apply: setDS.
+  by move=> x [|] => R g [??]; apply R.
+have [|?] := pselect (G set0).
+  move=> [V] fV; rewrite subset0 setD_eq0 => subK.
+  apply: (filterS (P:=V)); last exact: fV.
+  by move=> // g Vg y /subK [Ky]; apply => //; apply: Wh.
+have PG : ProperFilter G by [].
+have GK : G K. by (exists setT; [exact: filterT | by move=> ? []]).
+case: (cptK _ PG GK) => x [Kx]; rewrite/cluster/G /=.
+set E' := split_ent (split_ent ((E^-1)%classic `&` E)).
+have entE' : entourage E' by rewrite /E'.
+set R := [set y | forall f : X -> Y, W f -> E' (f x, f y)].
+set L := W `&` [set h | E' ( f x, h x)].
+have GL : G (small L). 
+  apply: in_filter_from; apply: (filterS (P := W `&` [set h | E' (f x, h x)])).
+    by move=> h ?.
+  rewrite /within; apply: (filterS (P:= [set h | E' (f x, h x)])); first by move=> ?.
+  by rewrite ?nbhs_simpl /E'; apply: ptws_cvg_entourage.
+move=> /(_ _ _ GL (ectsW x E' entE')) => [[z][]].
+rewrite /small => /= [[Kz]]/not_andP [?|] // /existsNP [g] /not_implyP.
+rewrite /L /= => [[[Wg Efg] nEz]].
+move=>/(_ g Wg) Egxz; contradict nEz.
+apply: entourage_split => //=.
+move=> Q; contradict Q; apply/existsNP; exists g; apply/not_implyP.
+
+
+
+rewrite /prop_near1.
+
+contradict Q; rewrite /meets.
+
+  Search ( (_ `\` _) `<=` _).
 End ArzelaAscoli.
