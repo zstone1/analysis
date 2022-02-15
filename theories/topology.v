@@ -5813,12 +5813,20 @@ move=> WsubV + x E entE => /(_ x E entE); apply: filter_app; apply:nearW.
 by move=> ? Vf ? /WsubV; exact: Vf.
 Qed.
 
-Lemma equicontinuous_cts (W : set (X -> Y)) f: 
+Lemma equicontinuous_continuous_for (W : set (X -> Y)) (f: X -> Y) x:
+  {for x, equicontinuous W} -> W f -> {for x, continuous f}.
+Proof. 
+move=> ectsW Wf; apply/cvg_entourageP => E entE; near_simpl; near=> y.
+by apply(near (ectsW _ entE)).
+Unshelve. end_near. Qed.
+
+Lemma equicontinuous_continuous (W : set (X -> Y)) (f: X -> Y):
   equicontinuous W -> W f -> continuous f.
 Proof. 
-move=> ectsW Wf x; apply/cvg_entourageP => E entE; near_simpl; 
-by move: (ectsW x _ entE); apply: filter_app; apply: nearW=> ?; apply.
+move=> ectsW Wf x; apply: equicontinuous_continuous_for; last exact: Wf.
+by move=> ?; exact: ectsW.
 Qed.
+
 
 (* A convienet notion that is in between compactness in 
    {family compact, X -> y} and compactness in {ptws X -> y}.*)
@@ -5900,51 +5908,51 @@ Lemma ptws_compact_cvg (W : set ({ptws X -> Y})) F f:
 Proof.
 move=> ectsW FF FW Wf; split; last exact: ptws_cvg_compact_family.
 move=> ptwsF; apply/fam_cvgP=> K cptK. 
-have [->|/set0P [k0 Kk0]] := eqVneq K set0; first exact: cvg_uniform_set0.
 rewrite /uniform_fun => U /=; rewrite uniform_nbhs => [[E [entE EsubU]]]. 
 suff : within W (nbhs F) U.
-  by rewrite/within nbhs_simpl => wwF; apply: (filter_app2 _ _ wwF FW); apply: nearW.
+  by rewrite/within nbhs_simpl => wwF; apply: (filterS2 _ _ wwF FW).
 apply: (filterS EsubU); apply: ptwsF; rewrite /ptws_fun /=.
 suff : within W (nbhs f) [set g | forall y, K y -> E (f y, g y)] by [].
 
-set small := fun U => 
+(* These sets let us pinpoint regions of K with non-uniform convergence  *)
+set nonUniform := fun U => 
   K `\` [set y : X | K y /\ forall g, U g -> E (f y, g y)].
-
-(* G is a filter that lets us target `bad` points that break convergence*)
-set G := filter_from (within W (nbhs (f : {ptws X -> Y}))) small.
+set G := filter_from (within W (nbhs (f : {ptws X -> Y}))) nonUniform.
 have FG: Filter G. 
   apply: filter_from_filter; first by (exists setT; apply: filterT).
   move=> P Q fP fQ; exists (P `&` Q); first exact: filterI.
-  rewrite /small /= !setDIr !setDv !set0U -setDUr; apply: setDS.
+  rewrite /nonUniform /= !setDIr !setDv !set0U -setDUr; apply: setDS.
   by move=> x [|] => R g [??]; apply R.
 have [|?] := pselect (G set0).
+  (* this is the 'real' case, with uniform converge *)
   move=> [V] fV; rewrite subset0 setD_eq0 => subK.
   apply: (filterS (P:=V)); last exact: fV.
   by move=> // g Vg y /subK [Ky]; apply => //; apply: Wh.
+
 have PG : ProperFilter G by [].
-have GK : G K. by (exists setT; [exact: filterT | by move=> ? []]).
-case: (cptK _ PG GK) => x [Kx]; rewrite/cluster/G /=.
-set E' := split_ent (split_ent ((E^-1)%classic `&` E)).
+have GK : G K by (exists setT; [exact: filterT | by move=> ? []]).
+
+(* compactness let us find a point that actually violates uniform convergence *)
+case: (cptK _ PG GK) => x [Kx].
+set E' := split_ent (split_ent E).
 have entE' : entourage E' by rewrite /E'.
-set R := [set y | forall f : X -> Y, W f -> E' (f x, f y)].
+have R : \forall y \near x, 
+    (forall g : X -> Y, W g -> E' (g x, g y)) /\ E' (f y, f x).
+  apply/near_andP; split; near_simpl; first exact: ectsW.
+  near=> y; suff : ((E' ^-1)%classic)(f x, f y) by []; near: y.
+  apply: ((equicontinuous_continuous _ Wf) x (to_set ((E')^-1%classic) _)).
+    by apply: ectsW.
+  by apply: nbhs_entourage.
 set L := W `&` [set h | E' ( f x, h x)].
-have GL : G (small L). 
-  apply: in_filter_from; apply: (filterS (P := W `&` [set h | E' (f x, h x)])).
-    by move=> h ?.
-  rewrite /within; apply: (filterS (P:= [set h | E' (f x, h x)])); first by move=> ?.
-  by rewrite ?nbhs_simpl /E'; apply: ptws_cvg_entourage.
-move=> /(_ _ _ GL (ectsW x E' entE')) => [[z][]].
-rewrite /small => /= [[Kz]]/not_andP [?|] // /existsNP [g] /not_implyP.
-rewrite /L /= => [[[Wg Efg] nEz]].
-move=>/(_ g Wg) Egxz; contradict nEz.
-apply: entourage_split => //=.
-move=> Q; contradict Q; apply/existsNP; exists g; apply/not_implyP.
-
-
-
-rewrite /prop_near1.
-
-contradict Q; rewrite /meets.
-
-  Search ( (_ `\` _) `<=` _).
+have GL : G (nonUniform L). 
+  apply: in_filter_from; apply: (filterS); first by move=>?; apply.
+  rewrite /within; apply: (filterS (P:= [set h | E' (f x, h x)])).
+    by move=> ?.
+  exact: ptws_cvg_entourage.
+move=> /(_ _ _ GL R) => [[z][[Kz]]] /[swap] [[gxz fzx]].
+apply: absurd; split => // g [Wg fxgx].
+apply: entourage_split; first last => //. 
+  by (apply: entourage_split; last exact: gxz) => //=; exact fxgx.
+by apply: entourage_split => //; [exact: fzx | exact: entourage_refl].
+Unshelve. end_near. Qed.
 End ArzelaAscoli.
