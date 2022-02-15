@@ -2535,6 +2535,8 @@ have [?|Et] := pselect (E t); [by left|right=> U tU; have [p []] := cEt _ tU].
 by exists p; split => //; apply/eqP => pt; apply: Et; rewrite -pt.
 Qed.
 
+
+
 Definition closed (D : set T) := closure D `<=` D.
 
 Lemma closedC (D : set T) : open D -> closed (~` D).
@@ -2677,6 +2679,24 @@ split.
   by exists A => //; rewrite setIC setIT.
 move=> A FA; exists A => //; exists A => //; exists setT; first exact: filterT.
 by rewrite setIT.
+Qed.
+
+Lemma closureEcvg (E : set T) x : 
+  E x ->
+  closure E = [set f | exists F, ProperFilter F /\ F E /\ F --> f].
+Proof.
+rewrite eqEsubset; split => f /=; first last.
+  move=> [F [FF [FE Ff]]] U /= nbhsU; apply: (filter_ex (FF :=FF)).
+  by apply: filterI => //; exact: Ff.
+move=> clEf; exists (filter_from (nbhs f) (fun X => X `&` E)); split;[|split].
+- apply: Build_ProperFilter; last apply: filter_from_filter.
+  + move=> P [Q nbhsQ QEsubP]; case/(_ Q nbhsQ): clEf => x EQx; exists x.
+    by apply QEsubP; rewrite setIC.
+  + by exists setT; apply: filter_nbhsT.
+  + move=> I J ? ?; exists ( I `&` J); last by move=> ? [[]]; repeat split.
+    exact: filterI.
+- by (exists setT; first exact: filter_nbhsT) => ? [].
+- by move=> U /= ?; exists U => // ? [].
 Qed.
 
 Definition compact A := forall (F : set (set T)),
@@ -5897,22 +5917,23 @@ apply: (@entourage_split _ (g y)) => //; first last.
 by apply: ((near (@ectsW x _ _)) y). 
 Unshelve. all: by end_near. Qed.
 
-Hint Extern 0 (entourage (_ `&` _)) => exact: filterI : core.
 
-Lemma ptws_compact_cvg (W : set ({ptws X -> Y})) F f:
-  equicontinuous W -> 
-  ProperFilter F ->
-  F W -> 
-  W f ->
+Lemma ptws_compact_cvg (W : set ({ptws X -> Y})) F (f : {ptws X -> Y}):
+  equicontinuous W -> ProperFilter F -> F W ->
   {ptws, F --> f} <-> {family compact, F --> f}.
 Proof.
-move=> ectsW FF FW Wf; split; last exact: ptws_cvg_compact_family.
+move=> + PF; wlog Wf : f W / W f.
+  move=> + /equicontinuous_closure ectsCW FW => /(_ f _ _ ectsCW) Q.
+  split; last by apply: ptws_cvg_compact_family.
+  move=> Ftof; apply/Q => //; first by (rewrite closureEcvg; exists F).
+  by apply: (filterS _ FW); apply: subset_closure.
+move=> ectsW FW; split; last exact: ptws_cvg_compact_family.
 move=> ptwsF; apply/fam_cvgP=> K cptK. 
 rewrite /uniform_fun => U /=; rewrite uniform_nbhs => [[E [entE EsubU]]]. 
 suff : within W (nbhs F) U.
   by rewrite/within nbhs_simpl => wwF; apply: (filterS2 _ _ wwF FW).
 apply: (filterS EsubU); apply: ptwsF; rewrite /ptws_fun /=.
-suff : within W (nbhs f) [set g | forall y, K y -> E (f y, g y)] by [].
+suff : within W (nbhs (f)) [set g | forall y, K y -> E (f y, g y)] by [].
 
 (* These sets let us pinpoint regions of K with non-uniform convergence  *)
 set nonUniform := fun U => 
@@ -5955,4 +5976,23 @@ apply: entourage_split; first last => //.
   by (apply: entourage_split; last exact: gxz) => //=; exact fxgx.
 by apply: entourage_split => //; [exact: fzx | exact: entourage_refl].
 Unshelve. end_near. Qed.
+
+Lemma ascoli_forward (W : (set (X -> Y))): 
+  pointwise_precompact W -> 
+  equicontinuous W -> 
+  precompact (W : set {family compact, X -> Y }).
+Proof.
+move=> /pointwise_precompact_precompact + ectsW.
+rewrite ?precompactE compact_ultra compact_ultra. 
+have -> : closure (W : set {family compact, X -> Y}) = 
+       closure (W : set {ptws X -> Y}). 
+  rewrite ?closureEcvg predeqE; split; move => [F [? [? ?]]]; exists F. 
+    by split; [|split] => //; apply/(ptws_compact_cvg (W:=W)).
+  by split; [|split] => //; apply/(ptws_compact_cvg (W:=W)).
+move=> /= + F UF FcW => /(_ F UF FcW); case=> p [cWp Fp]; exists p; split => //.
+apply/(ptws_compact_cvg _ _ _ FcW) => //. 
+exact: equicontinuous_closure.
+Qed.
+
+
 End ArzelaAscoli.
