@@ -5808,32 +5808,33 @@ Proof.  by [].  Qed.
 Lemma near_compact_local {X : topologicalType} {Y : topologicalType} 
   (F : set(set X)) (P : X -> Y -> Prop) (K : set Y):
   ProperFilter F -> compact K -> 
-  (forall y g, \forall f \near g, P y g -> P y f) ->
-  (forall g, K g -> \forall x \near F, P x g) ->
-  \forall x \near F, forall g, K g -> P x g.
+  (forall y, K y -> \forall x \near F, P x y) ->
+  (forall y, \forall y' \near y & x \near F, P x y -> P x y') ->
+  \forall x \near F, forall y, K y -> P x y.
 Proof.
-move=> FF cptK ptws local.
-set badPoints := fun U => K `\` [set g | K g /\ forall x, U x -> P x g].
+move=> FF cptK local ptws.
+set badPoints := fun U => K `\` [set y | K y /\ forall x, U x -> P x y].
 set G := filter_from F badPoints.
 have FG: Filter G. 
   apply: filter_from_filter; first by (exists setT; apply: filterT).
   move=> L R ?? ; exists (L `&` R); first exact: filterI.
   rewrite /badPoints /= !setDIr !setDv !set0U -setDUr; apply: setDS.
-  by move=> x [|] => + g [??]; apply.
+  by move=> x [|] => + ? [??]; apply.
 have [|?] := pselect (G set0).
   (* this is the 'real' case, with uniform converge *)
   move=> [V] fV; rewrite subset0 setD_eq0 => subK.
   apply: (filterS (P:=V)); last exact: fV.
-  by move=> // g Vg y /subK [Ky]; apply => //; apply: Wh.
+  by move=> // ? ? ? /subK [?]; apply => //; apply: Wh.
 have PG : ProperFilter G by [].
 have GK : G K by (exists setT; [exact: filterT | by move=> ? []]).
-case: (cptK _ PG GK) => g [Kg]; have FP := local g Kg.
-have G2P: G (badPoints [set x | P x g]). 
-  by exists ([set x | P x g]); first apply ((local g Kg)).
-move=> /(_ _ _ G2P Ug) => [[f[]]][] Kf /[swap] Uf.
-apply: absurd; split => // y /= Pyg.
-admit.
-Admitted.
+case: (cptK _ PG GK) => y [Ky]. 
+have [[U1 U2] []] := (ptws y) => /= U1y U2F subP.
+have GP: G (badPoints ([set x | P x y] `&` U2)). 
+  apply: filterI => //; exists ([set x | P x y] `&` U2); last by move=> ? [?].
+  by apply: filterI => //; apply: (local y Ky).
+move=> /(_ _ _ GP U1y) => [[y'[]]][] ? /[swap] ?; apply absurd.
+by split => // x /= [Pxy U2x]; apply: (subP (y', x)).
+Qed.
 
 Section ArzelaAscoli.
 Context {X : topologicalType}.
@@ -5956,6 +5957,13 @@ suff : within W (nbhs F) U.
   by rewrite/within nbhs_simpl => wwF; apply: (filterS2 _ _ wwF FW).
 apply: (filterS EsubU); apply: ptwsF; rewrite /ptws_fun /=.
 suff : within W (nbhs (f)) [set g | forall y, K y -> E (f y, g y)] by [].
+apply: (near_compact_local (F:= within W (nbhs f))) => //.
+- by apply: within_nbhs_proper; apply: subset_closure.
+- move=> y Ky; apply: (cvg_within (F := nbhs f)); near_simpl.
+  by apply: ptws_cvg_entourage.
+move=> x. 
+
+
 
 (* These sets let us pinpoint regions of K with non-uniform convergence  *)
 set nonUniform := fun U => 
