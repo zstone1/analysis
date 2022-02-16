@@ -2658,10 +2658,15 @@ Lemma cvg_cluster F G : F --> G -> cluster F `<=` cluster G.
 Proof. by move=> sGF p Fp P Q GP Qp; apply: Fp Qp; apply: sGF. Qed.
 
 Lemma cluster_cvgE F :
-  ProperFilter F ->
+  Filter F ->
   cluster F = [set p | exists2 G, ProperFilter G & G --> p /\ F `<=` G].
 Proof.
-move=> FF; rewrite predeqE => p.
+have [F0|nF0] := pselect (F set0).
+  have -> : cluster F = set0.
+    by rewrite -subset0 clusterE => x /(_ set0 F0); rewrite closure0.
+  by symmetry; rewrite -subset0 => p /= [G PG [_ /(_ set0 F0)]]; apply PG.
+
+move=> FF; rewrite predeqE => p; have PF : ProperFilter F by [].
 split=> [clFp|[G Gproper [cvGp sFG]] A B]; last first.
   by move=> /sFG GA /cvGp GB; apply: (@filter_ex _ G); apply: filterI.
 exists (filter_from (\bigcup_(A in F) [set A `&` B | B in nbhs p]) id).
@@ -2681,23 +2686,9 @@ move=> A FA; exists A => //; exists A => //; exists setT; first exact: filterT.
 by rewrite setIT.
 Qed.
 
-Lemma closureEcvg (E : set T) x : 
-  E x ->
-  closure E = [set f | exists F, ProperFilter F /\ F E /\ F --> f].
-Proof.
-rewrite eqEsubset; split => f /=; first last.
-  move=> [F [FF [FE Ff]]] U /= nbhsU; apply: (filter_ex (FF :=FF)).
-  by apply: filterI => //; exact: Ff.
-move=> clEf; exists (filter_from (nbhs f) (fun X => X `&` E)); split;[|split].
-- apply: Build_ProperFilter; last apply: filter_from_filter.
-  + move=> P [Q nbhsQ QEsubP]; case/(_ Q nbhsQ): clEf => x EQx; exists x.
-    by apply QEsubP; rewrite setIC.
-  + by exists setT; apply: filter_nbhsT.
-  + move=> I J ? ?; exists ( I `&` J); last by move=> ? [[]]; repeat split.
-    exact: filterI.
-- by (exists setT; first exact: filter_nbhsT) => ? [].
-- by move=> U /= ?; exists U => // ? [].
-Qed.
+Lemma closureEcvg (E : set T): 
+  closure E = [set p | exists2 G, ProperFilter G & G --> p /\ globally E `<=` G].
+Proof.  by rewrite closureEcluster cluster_cvgE. Qed.
 
 Definition compact A := forall (F : set (set T)),
   ProperFilter F -> F A -> A `&` cluster F !=set0.
@@ -5925,8 +5916,10 @@ Proof.
 move=> + PF; wlog Wf : f W / W f.
   move=> + /equicontinuous_closure ectsCW FW => /(_ f _ _ ectsCW) Q.
   split; last by apply: ptws_cvg_compact_family.
-  move=> Ftof; apply/Q => //; first by (rewrite closureEcvg; exists F).
-  by apply: (filterS _ FW); apply: subset_closure.
+  move=> Ftof; apply/Q => //; last first.
+    by apply: (filterS _ FW); apply: subset_closure.
+  rewrite closureEcvg; (exists F; last split) => // => U WU. 
+  by apply: filterS; first exact: WU.
 move=> ectsW FW; split; last exact: ptws_cvg_compact_family.
 move=> ptwsF; apply/fam_cvgP=> K cptK. 
 rewrite /uniform_fun => U /=; rewrite uniform_nbhs => [[E [entE EsubU]]]. 
@@ -5986,9 +5979,9 @@ move=> /pointwise_precompact_precompact + ectsW.
 rewrite ?precompactE compact_ultra compact_ultra. 
 have -> : closure (W : set {family compact, X -> Y}) = 
        closure (W : set {ptws X -> Y}). 
-  rewrite ?closureEcvg predeqE; split; move => [F [? [? ?]]]; exists F. 
-    by split; [|split] => //; apply/(ptws_compact_cvg (W:=W)).
-  by split; [|split] => //; apply/(ptws_compact_cvg (W:=W)).
+  rewrite ?closureEcvg // predeqE; split; move=> [F PF [Fx WF]]; exists F => //.
+    by split=> //; apply/(ptws_compact_cvg (W:=W))=>//; exact: WF.
+  by split=> //; apply/(ptws_compact_cvg (W:=W))=>//; exact: WF.
 move=> /= + F UF FcW => /(_ F UF FcW); case=> p [cWp Fp]; exists p; split => //.
 apply/(ptws_compact_cvg _ _ _ FcW) => //. 
 exact: equicontinuous_closure.
