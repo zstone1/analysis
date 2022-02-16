@@ -5805,6 +5805,36 @@ Lemma entourage_sym {X Y : Type} E (x:X) (y:Y) :
   E (x, y) <-> (E^-1)%classic (y, x).
 Proof.  by [].  Qed.
 
+Lemma near_compact_local {X : topologicalType} {Y : topologicalType} 
+  (F : set(set X)) (P : X -> Y -> Prop) (K : set Y):
+  ProperFilter F -> compact K -> 
+  (forall y g, \forall f \near g, P y g -> P y f) ->
+  (forall g, K g -> \forall x \near F, P x g) ->
+  \forall x \near F, forall g, K g -> P x g.
+Proof.
+move=> FF cptK ptws local.
+set badPoints := fun U => K `\` [set g | K g /\ forall x, U x -> P x g].
+set G := filter_from F badPoints.
+have FG: Filter G. 
+  apply: filter_from_filter; first by (exists setT; apply: filterT).
+  move=> L R ?? ; exists (L `&` R); first exact: filterI.
+  rewrite /badPoints /= !setDIr !setDv !set0U -setDUr; apply: setDS.
+  by move=> x [|] => + g [??]; apply.
+have [|?] := pselect (G set0).
+  (* this is the 'real' case, with uniform converge *)
+  move=> [V] fV; rewrite subset0 setD_eq0 => subK.
+  apply: (filterS (P:=V)); last exact: fV.
+  by move=> // g Vg y /subK [Ky]; apply => //; apply: Wh.
+have PG : ProperFilter G by [].
+have GK : G K by (exists setT; [exact: filterT | by move=> ? []]).
+case: (cptK _ PG GK) => g [Kg]; have FP := local g Kg.
+have G2P: G (badPoints [set x | P x g]). 
+  by exists ([set x | P x g]); first apply ((local g Kg)).
+move=> /(_ _ _ G2P Ug) => [[f[]]][] Kf /[swap] Uf.
+apply: absurd; split => // y /= Pyg.
+admit.
+Admitted.
+
 Section ArzelaAscoli.
 Context {X : topologicalType}.
 Context {Y : uniformType}.
@@ -5908,7 +5938,6 @@ apply: (@entourage_split _ (g y)) => //; first last.
 by apply: ((near (@ectsW x _ _)) y). 
 Unshelve. all: by end_near. Qed.
 
-
 Lemma ptws_compact_cvg (W : set ({ptws X -> Y})) F (f : {ptws X -> Y}):
   equicontinuous W -> ProperFilter F -> F W ->
   {ptws, F --> f} <-> {family compact, F --> f}.
@@ -5963,7 +5992,7 @@ have GL : G (nonUniform L).
   rewrite /within; apply: (filterS (P:= [set h | E' (f x, h x)])).
     by move=> ?.
   exact: ptws_cvg_entourage.
-move=> /(_ _ _ GL R) => [[z][[Kz]]] /[swap] [[gxz fzx]].
+move=> /(_ _ _ GL R). => [[z][[Kz]]] /[swap] [[gxz fzx]].
 apply: absurd; split => // g [Wg fxgx].
 apply: entourage_split; first last => //. 
   by (apply: entourage_split; last exact: gxz) => //=; exact fxgx.
