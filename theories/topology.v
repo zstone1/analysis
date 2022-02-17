@@ -5461,6 +5461,15 @@ Lemma fam_cvgE {U : topologicalType} {V : uniformType} (F : set (set (U -> V)))
   {family fam, F --> f} = (F --> (f : {family fam, U -> V})).
 Proof. by []. Qed.
 
+Lemma fam_nbhs {U : topologicalType} { V : uniformType} 
+  (fam : set U -> Prop) (A : set U) (E : set(V * V)) (f : {family fam, U -> V}): 
+  entourage E -> fam A -> nbhs f [set g | forall y, A y -> E (f y, g y)].
+Proof.
+move=> entE famA; have /fam_cvgP /(_ A) : (nbhs f --> f) by []; apply => //.
+by apply uniform_nbhs; exists E; split => //.
+Qed.
+
+
 Definition compactly_in {U : topologicalType} (A : set U) :=
   [set B | B `<=` A /\ compact B].
 
@@ -6002,15 +6011,25 @@ Lemma compact_equicontinuous (W : set {family compact, X -> Y}) :
   equicontinuous W.
 Proof.
 move=> lcptX ctsW cptW x E entE.
-set E' := split_ent (split_ent E).
-have entE' : entourage E' by rewrite /E'.
+set E' := split_ent (split_ent E) `&` (split_ent (split_ent E))^-1%classic.
+have entE' : entourage E'.
+  by rewrite /E'; apply filterI.
 set Q := fun (y : X) (f : {family compact, X -> Y}) => E' (f x, f y).
 apply: (near_compact_covering (Q := Q)) => //.
   move=> f Wf; rewrite /Q; near_simpl.
   by apply: ((ctsW f Wf x) (to_set E' _)) => //; apply: nbhs_entourage.
 move=> f; rewrite /Q.
-have := lcptX x; (case; first by []) => U Ux [cptU clU].
-have : nbhs f [set g | forall x, U x -> E' (f x, g x)].
-  
+have := lcptX x; (case; first by []) => U UWx [cptU clU].
+have Ux : nbhs x U. 
+  by move: UWx; rewrite /within; apply: filterS => ?; apply.
+exists ([set g | forall x, U x -> E' (f x, g x)], U); first split => //.
+  by exact: fam_nbhs.
+move=> /= [g y] /= [] fygy Uy fxfy.
+apply: entourage_split; first last => //. 
+  apply: entourage_split => //; last (have [+ _]:= (fygy y Uy); apply). 
+  by (have [+ _]:= fxfy; apply).
+apply: entourage_split => //; [| exact: entourage_refl].
+(have [_ +]:= (fygy x (nbhs_singleton Ux)); apply).
+Qed.
 
 End ArzelaAscoli.
