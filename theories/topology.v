@@ -2749,6 +2749,37 @@ have : G (A `&` f @^-1` B) by exists B.
 by move=> /clsGp /(_ p_Cf) [q [[]]]; exists (f q).
 Qed.
 
+Lemma near_compact_covering {X : topologicalType} {Y : topologicalType} 
+  (F : set(set X)) (Q P : X -> Y -> Prop) (K : set Y):
+  Filter F -> compact K -> 
+  (forall y, K y -> \forall x \near F, Q x y) ->
+  (forall y, \forall y' \near y & x \near F, Q x y -> P x y') ->
+  \forall x \near F, forall y, K y -> P x y.
+Proof.
+move=> FF cptK cover nearby.
+set badPoints := fun U => K `\` [set y | K y /\ forall x, U x -> P x y].
+set G := filter_from F badPoints.
+have FG: Filter G. 
+  apply: filter_from_filter; first by (exists setT; apply: filterT).
+  move=> L R ?? ; exists (L `&` R); first exact: filterI.
+  rewrite /badPoints /= !setDIr !setDv !set0U -setDUr; apply: setDS.
+  by move=> x [|] => + ? [??]; apply.
+have [|?] := pselect (G set0).
+  (* this is the 'real' case, with uniform converge *)
+  move=> [V] fV; rewrite subset0 setD_eq0 => subK.
+  apply: (filterS (P:=V)); last exact: fV.
+  by move=> // ? ? ? /subK [?]; apply => //; apply: Wh.
+have PG : ProperFilter G by [].
+have GK : G K by (exists setT; [exact: filterT | by move=> ? []]).
+case: (cptK _ PG GK) => y [Ky]. 
+have [[U1 U2] []] := (nearby y) => /= U1y U2F subP.
+have GP: G (badPoints ([set x | Q x y] `&` U2)). 
+  apply: filterI => //; exists ([set x | Q x y] `&` U2); last by move=> ? [?].
+  by apply: filterI => //; apply: (cover y Ky).
+move=> /(_ _ _ GP U1y) => [[y'[]]][] ? /[swap] ?; apply absurd.
+by split => // x /= [Pxy U2x]; apply: (subP (y', x)) => //.
+Qed.
+
 Section Tychonoff.
 
 Class UltraFilter T (F : set (set T)) := {
@@ -5805,37 +5836,6 @@ Lemma entourage_sym {X Y : Type} E (x:X) (y:Y) :
   E (x, y) <-> (E^-1)%classic (y, x).
 Proof.  by [].  Qed.
 
-Lemma near_compact_local {X : topologicalType} {Y : topologicalType} 
-  (F : set(set X)) (P : X -> Y -> Prop) (K : set Y):
-  ProperFilter F -> compact K -> 
-  (forall y, K y -> \forall x \near F, P x y) ->
-  (forall y, \forall y' \near y & x \near F, P x y -> P x y') ->
-  \forall x \near F, forall y, K y -> P x y.
-Proof.
-move=> FF cptK local ptws.
-set badPoints := fun U => K `\` [set y | K y /\ forall x, U x -> P x y].
-set G := filter_from F badPoints.
-have FG: Filter G. 
-  apply: filter_from_filter; first by (exists setT; apply: filterT).
-  move=> L R ?? ; exists (L `&` R); first exact: filterI.
-  rewrite /badPoints /= !setDIr !setDv !set0U -setDUr; apply: setDS.
-  by move=> x [|] => + ? [??]; apply.
-have [|?] := pselect (G set0).
-  (* this is the 'real' case, with uniform converge *)
-  move=> [V] fV; rewrite subset0 setD_eq0 => subK.
-  apply: (filterS (P:=V)); last exact: fV.
-  by move=> // ? ? ? /subK [?]; apply => //; apply: Wh.
-have PG : ProperFilter G by [].
-have GK : G K by (exists setT; [exact: filterT | by move=> ? []]).
-case: (cptK _ PG GK) => y [Ky]. 
-have [[U1 U2] []] := (ptws y) => /= U1y U2F subP.
-have GP: G (badPoints ([set x | P x y] `&` U2)). 
-  apply: filterI => //; exists ([set x | P x y] `&` U2); last by move=> ? [?].
-  by apply: filterI => //; apply: (local y Ky).
-move=> /(_ _ _ GP U1y) => [[y'[]]][] ? /[swap] ?; apply absurd.
-by split => // x /= [Pxy U2x]; apply: (subP (y', x)).
-Qed.
-
 Section ArzelaAscoli.
 Context {X : topologicalType}.
 Context {Y : uniformType}.
@@ -5945,67 +5945,44 @@ Lemma ptws_compact_cvg (W : set ({ptws X -> Y})) F (f : {ptws X -> Y}):
 Proof.
 move=> + PF; wlog Wf : f W / W f.
   move=> + /equicontinuous_closure ectsCW FW => /(_ f _ _ ectsCW) Q.
-  split; last by apply: ptws_cvg_compact_family.
-  move=> Ftof; apply/Q => //; last first.
-    by apply: (filterS _ FW); apply: subset_closure.
-  rewrite closureEcvg; (exists F; last split) => // => U WU. 
-  by apply: filterS; first exact: WU.
+  (split; last by apply: ptws_cvg_compact_family) => Ftof; apply/Q => //. 
+    rewrite closureEcvg; (exists F; last split) => // => U WU. 
+    by apply: filterS; first exact: WU.
+  by apply: (filterS _ FW); apply: subset_closure.
 move=> ectsW FW; split; last exact: ptws_cvg_compact_family.
-move=> ptwsF; apply/fam_cvgP=> K cptK. 
-rewrite /uniform_fun => U /=; rewrite uniform_nbhs => [[E [entE EsubU]]]. 
-suff : within W (nbhs F) U.
+move=> ptwsF; apply/fam_cvgP=> K cptK U /=. 
+rewrite uniform_nbhs => [[E [? EsubU]]]; suff : within W (nbhs F) U.
   by rewrite/within nbhs_simpl => wwF; apply: (filterS2 _ _ wwF FW).
-apply: (filterS EsubU); apply: ptwsF; rewrite /ptws_fun /=.
-suff : within W (nbhs (f)) [set g | forall y, K y -> E (f y, g y)] by [].
-apply: (near_compact_local (F:= within W (nbhs f))) => //.
-- by apply: within_nbhs_proper; apply: subset_closure.
-- move=> y Ky; apply: (cvg_within (F := nbhs f)); near_simpl.
-  by apply: ptws_cvg_entourage.
-move=> x. 
-
-
-
-(* These sets let us pinpoint regions of K with non-uniform convergence  *)
-set nonUniform := fun U => 
-  K `\` [set y : X | K y /\ forall g, U g -> E (f y, g y)].
-set G := filter_from (within W (nbhs (f : {ptws X -> Y}))) nonUniform.
-have FG: Filter G. 
-  apply: filter_from_filter; first by (exists setT; apply: filterT).
-  move=> P Q fP fQ; exists (P `&` Q); first exact: filterI.
-  rewrite /nonUniform /= !setDIr !setDv !set0U -setDUr; apply: setDS.
-  by move=> x [|] => R g [??]; apply R.
-have [|?] := pselect (G set0).
-  (* this is the 'real' case, with uniform converge *)
-  move=> [V] fV; rewrite subset0 setD_eq0 => subK.
-  apply: (filterS (P:=V)); last exact: fV.
-  by move=> // g Vg y /subK [Ky]; apply => //; apply: Wh.
-
-have PG : ProperFilter G by [].
-have GK : G K by (exists setT; [exact: filterT | by move=> ? []]).
-
-(* compactness let us find a point that actually violates uniform convergence *)
-case: (cptK _ PG GK) => x [Kx].
+apply: (filterS EsubU); apply: ptwsF.
+suff: \forall g \near within W (nbhs f), forall y, K y -> E (f y, g y) by [].
 set E' := split_ent (split_ent E).
 have entE' : entourage E' by rewrite /E'.
-have R : \forall y \near x, 
-    (forall g : X -> Y, W g -> E' (g x, g y)) /\ E' (f y, f x).
-  apply/near_andP; split; near_simpl; first exact: ectsW.
+apply: (near_compact_covering (Q := fun h x => E' (f x, h x)))=> //.
+  move=> y Ky; apply: (cvg_within (F := nbhs f)); near_simpl.  
+  by apply: ptws_cvg_entourage.
+move=> x.
+set R := fun y => (forall g : X -> Y, W g -> E' (g x, g y)) /\ E' (f y, f x).
+exists (R, W); first (split; last by (rewrite nbhs_simpl; apply: withinT)).
+  apply/near_andP; split; first exact: ectsW.
   near=> y; suff : ((E' ^-1)%classic)(f x, f y) by []; near: y.
-  apply: ((equicontinuous_continuous _ Wf) x (to_set ((E')^-1%classic) _)).
-    by apply: ectsW.
+  apply: ((equicontinuous_continuous _ Wf) x (to_set (E'^-1%classic) _)) => //.
   by apply: nbhs_entourage.
-set L := W `&` [set h | E' ( f x, h x)].
-have GL : G (nonUniform L). 
-  apply: in_filter_from; apply: (filterS); first by move=>?; apply.
-  rewrite /within; apply: (filterS (P:= [set h | E' (f x, h x)])).
-    by move=> ?.
-  exact: ptws_cvg_entourage.
-move=> /(_ _ _ GL R). => [[z][[Kz]]] /[swap] [[gxz fzx]].
-apply: absurd; split => // g [Wg fxgx].
+simpl=> [[y g]]/= [[gxgy] fyfx] Wg fxgx.
 apply: entourage_split; first last => //. 
-  by (apply: entourage_split; last exact: gxz) => //=; exact fxgx.
-by apply: entourage_split => //; [exact: fzx | exact: entourage_refl].
+  by (apply: entourage_split; last exact: gxgy) => //=; exact fxgx.
+by apply: entourage_split => //; [exact: fyfx | exact: entourage_refl].
 Unshelve. end_near. Qed.
+
+Lemma ptws_compact_closed (W : set (X -> Y)) : 
+  equicontinuous W -> 
+  closure (W : set {family compact, X -> Y}) = 
+  closure (W : set {ptws X -> Y}). 
+Proof.
+rewrite ?closureEcvg // predeqE => ? ?.
+split; move=> [F PF [Fx WF]]; (exists F; last split) => //.
+  by apply/(ptws_compact_cvg (W:=W))=>//; exact: WF.
+by apply/(ptws_compact_cvg (W:=W))=>//; exact: WF.
+Qed.
 
 Lemma ascoli_forward (W : (set (X -> Y))): 
   pointwise_precompact W -> 
@@ -6013,16 +5990,27 @@ Lemma ascoli_forward (W : (set (X -> Y))):
   precompact (W : set {family compact, X -> Y }).
 Proof.
 move=> /pointwise_precompact_precompact + ectsW.
-rewrite ?precompactE compact_ultra compact_ultra. 
-have -> : closure (W : set {family compact, X -> Y}) = 
-       closure (W : set {ptws X -> Y}). 
-  rewrite ?closureEcvg // predeqE; split; move=> [F PF [Fx WF]]; exists F => //.
-    by split=> //; apply/(ptws_compact_cvg (W:=W))=>//; exact: WF.
-  by split=> //; apply/(ptws_compact_cvg (W:=W))=>//; exact: WF.
+rewrite ?precompactE compact_ultra compact_ultra ptws_compact_closed => //. 
 move=> /= + F UF FcW => /(_ F UF FcW); case=> p [cWp Fp]; exists p; split => //.
-apply/(ptws_compact_cvg _ _ _ FcW) => //. 
-exact: equicontinuous_closure.
+by apply/(ptws_compact_cvg _ _ _ FcW) => //; exact: equicontinuous_closure. 
 Qed.
 
+Lemma compact_equicontinuous (W : set {family compact, X -> Y}) :
+  locally_compact (@setT X) ->
+  (forall f, W f -> continuous f) ->
+  compact (W : set {family compact, X -> Y}) -> 
+  equicontinuous W.
+Proof.
+move=> lcptX ctsW cptW x E entE.
+set E' := split_ent (split_ent E).
+have entE' : entourage E' by rewrite /E'.
+set Q := fun (y : X) (f : {family compact, X -> Y}) => E' (f x, f y).
+apply: (near_compact_covering (Q := Q)) => //.
+  move=> f Wf; rewrite /Q; near_simpl.
+  by apply: ((ctsW f Wf x) (to_set E' _)) => //; apply: nbhs_entourage.
+move=> f; rewrite /Q.
+have := lcptX x; (case; first by []) => U Ux [cptU clU].
+have : nbhs f [set g | forall x, U x -> E' (f x, g x)].
+  
 
 End ArzelaAscoli.
