@@ -36,6 +36,16 @@
     `continuous_subspaceT_for`, `continuous_subspaceT`, `continuous_open_subspace`
   + globals `subspace_filter`, `subspace_proper_filter`
   + notation `{within ..., continuous ...}`
+- in `topology.v`:
+  + Definition `sets_of`
+  + globals `sets_of_filter`, 
+  + lemmas `near_small_set`, `small_set_sub`
+  + lemmas `withinET`, `closureEcvg`, `entourage_sym`, `fam_nbhs`
+  + generalize `cluster_cvgE`, `ptws_cvg_compact_family`
+  + lemma `near_compact_covering`
+  + rewrite `equicontinuous` and `pointwise_precompact` to use index 
+  + lemmas `ptws_cvg_entourage`, `equicontinuous_closure`, `ptws_compact_cvg`
+    `ptws_compact_closed`, `ascoli_forward`, `compact_equicontinuous`
 - in `derive.v`
   + lemma `MVT_segment`
 - in `normedtype.v`
