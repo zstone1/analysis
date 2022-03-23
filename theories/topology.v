@@ -2809,33 +2809,37 @@ Qed.
 End Compact.
 Arguments hausdorff_space : clear implicits.
 
-Lemma near_compact_covering {X : topologicalType} {Y : topologicalType}
-    (F : set (set X)) (Q P : X -> Y -> Prop) (K : set Y) :
-  Filter F -> compact K ->
-  (forall y, K y -> \forall x \near F, Q x y) ->
-  (forall y, \forall y' \near y & x \near F, Q x y -> P x y') ->
-  \forall x \near F, K `<=` P x.
+Definition localizing {X : topologicalType} (K : set X) :=
+  forall (I : Type) (F : set (set I)) (Q P : I -> X -> Prop),
+  Filter F ->
+  (forall x, K x -> \forall i \near F, Q i x) ->
+  (forall x, K x -> \forall x' \near x & i \near F, Q i x -> P i x') ->
+  \near F, forall x, K x -> P F x.
+
+Lemma near_compact_covering {X : topologicalType} :
+  @compact X `<=` @localizing X.
 Proof.
-move=> FF cptK cover nearby.
-pose badPoints := fun U => K `\` [set y | K y /\ forall x, U x -> P x y].
+move=> K cptK I F Q P FF cover nearby.
+pose badPoints := fun U => K `\` [set x | K x /\ forall i, U i -> P i x].
 pose G := filter_from F badPoints.
 have FG : Filter G.
   apply: filter_from_filter; first by exists setT; exact: filterT.
   move=> L R ? ?; exists (L `&` R); first exact: filterI.
   rewrite /badPoints /= !setDIr !setDv !set0U -setDUr; apply: setDS.
-  by move=> x [|] => + ? [? ?]; exact.
+  by move=> ? [|] => + ? [? ?]; exact.
 have [|?] := pselect (G set0).
   move=> [V fV]; rewrite subset0 setD_eq0 => subK.
   by apply: (@filterS _ _ _ V) => // ? ? ? /subK [?]; apply.
 have PG : ProperFilter G by [].
 have GK : G K by exists setT; [exact: filterT | by move=> ? []].
-case: (cptK _ PG GK) => y [Ky]; have [[U1 U2] [U1y ? subP]] := nearby y.
-have GP : G (badPoints ([set x | Q x y] `&` U2)).
-  apply: filterI => //; exists ([set x | Q x y] `&` U2); last by move=> ? [].
-  by apply: filterI => //; exact: (cover y Ky).
-move=> /(_ _ _ GP U1y) => [[y'[]]][] ? /[swap] ?.
-by case; split => // x [? ?]; exact: (subP (y', x)).
+case: (cptK _ PG GK) => x [Kx]; have [[U1 U2] [U1x ? subP]] := nearby x Kx.
+have GP : G (badPoints ([set i | Q i x] `&` U2)).
+  apply: filterI => //; exists ([set i | Q i x] `&` U2); last by move=> ? [].
+  by apply: filterI => //; exact: (cover x Kx).
+move=> /(_ _ _ GP U1x) => [[x'[]]][] ? /[swap] ?.
+by case; split => // i [? ?]; exact: (subP (x', i)).
 Qed.
+
 
 Section Tychonoff.
 
@@ -6135,6 +6139,39 @@ Qed.
 
 End UniformPointwise.
 
+Lemma localizing_closed {X : topologicalType} (K : set X) :
+  hausdorff_space X -> localizing K -> closed K.
+Proof.
+move=> hsdfX locK; rewrite -[K]setCK closedC openE => x /= nKx.
+rewrite /interior.
+case: (sets_of_filter (nbhs_filter x)) => pF FsF.
+have G : forall y, K y -> exists U V, nbhs x U /\ nbhs y V /\ U `&` V == set0.
+  move=> y Ky; move: hsdfX; rewrite open_hausdorff => /(_ x y).
+  case; first by (apply/eqP => xy; apply:nKx; move: xy => ->).
+  case=> /= U V [Ux Vy] [oU oV UV0]; exists U; exists V; split;[|split] =>//.
+    by move: oU; rewrite openE; apply; apply set_mem.
+  by move: oV; rewrite openE; apply; apply set_mem.
+case (locK (set X) _ (fun U y => ~ U y) (fun U y => ~ U y) FsF).
+- move=> y Ky; apply/near_sets_ofP.
+    move=> ?? AsubB; apply/contra_not; apply AsubB.
+  case: (G y Ky)=> U [V [Ux [Vy UV0]]]; exists U => //.
+  move=> Uy; contradict UV0; apply/negP/set0P; exists y; split => //.
+  exact: nbhs_singleton.
+- move=> y Ky; case: (G y Ky)=> U [V [Ux [Vy UV0]]]; near_simpl.
+  pose M := [set U' | nbhs x U' /\ U' `<=` U]; exists (V, M) => //=. 
+    split => //=; rewrite nbhs_simpl; exists M => //=; split.
+    + by move=> U' [].
+    + by move=> U' U'' [] ? ? ? S; split => //; apply: (subset_trans S).
+    + by exists U; split.
+  move=> [z W][/=] Vz [] Wx WU _ Wz.
+  contradict UV0; apply/negP/set0P; exists z; split=> //.
+  by apply: WU.
+- move=> M [M_near_x MsubX [V MV]] MsubNF.
+  apply: (@filterS _ _ _ V); last exact: M_near_x.
+  apply: subsetC2; rewrite setCK.
+  by apply: MsubNF.
+Qed.
+
 Section ArzelaAscoli.
 Context {X : topologicalType}.
 Context {Y : uniformType}.
@@ -6262,16 +6299,16 @@ move=> W; wlog Wf : f W / W f.
   apply Q => //; last by (apply: (filterS _ FW); exact: subset_closure).
   by rewrite closureEcvg; exists F; [|split] => // ? /filterS; apply.
 move=> FW ectsW; split=> [ptwsF|]; last exact: ptws_cvg_compact_family.
-apply/fam_cvgP => K ? U /=; rewrite uniform_nbhs => [[E [? EsubU]]].
+apply/fam_cvgP => K cptK U /=; rewrite uniform_nbhs => [[E [? EsubU]]].
 suff : \forall g \near within W (nbhs f), forall y, K y -> E (f y, g y).
   rewrite near_withinE; near_simpl => N; apply: (filter_app _ _ FW).
   by apply ptwsF; near=> g => ?; apply EsubU; apply: (near N g).
 near (sets_of (@entourage Y)) => E'.
 have entE' : entourage E' by exact: (near (near_small_set _)).
 pose Q := fun (h : X -> Y) x => E' (f x, h x).
-apply: (@near_compact_covering _ _ _ Q) => //.
+move/near_compact_covering: cptK => /(_ _ _ Q); apply.
   by move=> y Ky; apply: (@cvg_within _ (nbhs f)); exact: ptws_cvg_entourage.
-move=> x; near_simpl; near=> y g => /= E'fxgx.
+move=> x Kx; near_simpl; near=> y g => /= E'fxgx.
 apply: (@entourage_split _ (f x)) => //.
   apply entourage_sym; apply: (near (small_ent_sub _) E') => //.
   exact: (near (ectsW x E' entE') y).
@@ -6321,9 +6358,9 @@ have [//|U UWx [cptU clU]] := lcptX x; rewrite withinET in UWx.
 near (sets_of (@entourage Y)) => E'.
 have entE' : entourage E' by exact: (near (near_small_set _)).
 pose Q := fun (y : X) (f : {family compact, X -> Y}) => E' (f x, f y).
-apply: (@near_compact_covering _ _ _ Q) => // f; rewrite /Q; near_simpl.
-  by move=> Wf; apply: ((ctsW f Wf x) (to_set _ _)); exact: nbhs_entourage.
-near=> g y => /= fxfy; apply: (@entourage_split _ (f x)) => //.
+move/near_compact_covering: cptW => /(_ _ _ Q); apply.
+  by move=> f Wf; apply: ((ctsW f Wf x) (to_set _ _)); exact: nbhs_entourage.
+move=> f Wf; near=> g y => /= fxfy; apply: (@entourage_split _ (f x)) => //.
   apply/entourage_sym; apply: (near (small_ent_sub _) E') => //.
   exact: (near (fam_nbhs _ entE' (@compact_set1 _ x)) g) => //.
 apply: (@entourage_split _ _) => //; apply: (near (small_ent_sub _) E') => //.
