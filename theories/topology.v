@@ -6159,35 +6159,24 @@ Qed.
 
 End UniformPointwise.
 
-Lemma localizing_closed {X : topologicalType} (K : set X) :
-  hausdorff_space X -> localizing2 K -> closed K.
+Lemma localizing_compact {X : uniformType} (K : set X) : 
+  localizing2 K -> compact K.
 Proof.
-move=> hsdfX locK; rewrite -[K]setCK closedC openE => x /= nKx.
-rewrite /interior.
-case: (sets_of_filter (nbhs_filter x)) => pF FsF.
-case (locK _ _ (fun U y => ~ U y) FsF).
-  move=> y Ky; move: hsdfX; rewrite open_hausdorff => /(_ x y).
-  case; first by (apply/eqP => xy; apply:nKx; move: xy => ->).
-  case=> /= U V [Ux Vy] [oU oV UV0].
-  pose M := [set U' | nbhs x U' /\ U' `<=` U]; exists (V, M) => //=. 
-    split; first by move: oV; rewrite openE; apply; apply set_mem.
-    rewrite nbhs_simpl; exists M => //=; split.
-    - by move=>?[].
-    - by move=> U' U'' [] ? ? ? S; split => //; apply: (subset_trans S).
-    - by exists U; split => //; move: oU; rewrite openE; apply; apply set_mem.
-  move=> [z W][/=] Vz [] Wx WU Wz.
-  contradict UV0; apply/negP/set0P; exists z; split=> //.
-  by apply: WU.
-- move=> M [M_near_x MsubX [V MV]] MsubNF.
-  apply: (@filterS _ _ _ V); last exact: M_near_x.
-  apply: subsetC2; rewrite setCK.
-  by apply: MsubNF.
-Qed.
-
-Lemma localizing_complete {X : uniformType} (K : set X) (F : set (set X)) :
-  localizing2 K -> Filter F -> cauchy F -> K (lim F).
-Proof.
-
+move=> locK F PF FK; pose P := fun (V : set X) (x : X) => ~ V x.
+apply/set0P/eqP=> KclstF0.
+case PF => + FF; apply; rewrite (_: xpredp0 = set0); last by [].
+rewrite -(@setIv _ K); apply: filterI => //.
+case/(_ _ (sets_of F) P): locK.
+  move=> x Kx; rewrite /P; case: (pselect (cluster F x)).
+    by move=> clstFx; contradict KclstF0; apply/eqP/set0P; exists x.
+  move=> /existsNP [U /existsNP [V /not_implyP [FU /not_implyP [nbhsV]]]] UV0.
+  near=> x' W => //= => Wx'.
+  have /(_ _ Wx') ? : W `<=` U by apply (near (small_set_sub FU) W).
+  have ? : V x' by apply: (near nbhsV x').
+  by apply: UV0; exists x'.
+move=> G [GF Gdown [U GU]] GP; apply: (@filterS _ _ _ U); last exact: GF.
+by move=> y Uy Ky; exact: (GP _ GU y Ky).
+Unshelve. all: end_near. Qed.
 
 Section ArzelaAscoli.
 Context {X : topologicalType}.
