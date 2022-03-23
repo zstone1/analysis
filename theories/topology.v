@@ -2816,6 +2816,26 @@ Definition localizing {X : topologicalType} (K : set X) :=
   (forall x, K x -> \forall x' \near x & i \near F, Q i x -> P i x') ->
   \near F, forall x, K x -> P F x.
 
+Definition localizing2 {X : topologicalType} (K : set X) :=
+  forall (I : Type) (F : set (set I)) (P : I -> X -> Prop),
+  Filter F ->
+  (forall x, K x -> \forall x' \near x & i \near F, P i x') ->
+  \near F, forall x, K x -> P F x.
+
+Lemma localizingQ {X : topologicalType} : 
+  @localizing X = @localizing2 X.
+Proof.
+rewrite eqEsubset; split.
+  move=> K + I F P FF N => /(_ _ _ (fun _ _ => True)); apply.
+    by move=> ??; exact: filterT.
+  by move=> x Kx; near=> y => _; near: y; apply: N.
+move=> K + I F Q P FF nQ nP; apply=> x Kx.
+move/(_ x Kx): nQ => nQ; move/(_ x Kx): nP => nP.
+apply: filter_app nP; near=> y i; apply => /=.
+by apply: (near nQ i).
+Unshelve. all: end_near. Qed.
+
+
 Lemma near_compact_covering {X : topologicalType} :
   @compact X `<=` @localizing X.
 Proof.
@@ -6140,30 +6160,22 @@ Qed.
 End UniformPointwise.
 
 Lemma localizing_closed {X : topologicalType} (K : set X) :
-  hausdorff_space X -> localizing K -> closed K.
+  hausdorff_space X -> localizing2 K -> closed K.
 Proof.
 move=> hsdfX locK; rewrite -[K]setCK closedC openE => x /= nKx.
 rewrite /interior.
 case: (sets_of_filter (nbhs_filter x)) => pF FsF.
-have G : forall y, K y -> exists U V, nbhs x U /\ nbhs y V /\ U `&` V == set0.
+case (locK _ _ (fun U y => ~ U y) FsF).
   move=> y Ky; move: hsdfX; rewrite open_hausdorff => /(_ x y).
   case; first by (apply/eqP => xy; apply:nKx; move: xy => ->).
-  case=> /= U V [Ux Vy] [oU oV UV0]; exists U; exists V; split;[|split] =>//.
-    by move: oU; rewrite openE; apply; apply set_mem.
-  by move: oV; rewrite openE; apply; apply set_mem.
-case (locK (set X) _ (fun U y => ~ U y) (fun U y => ~ U y) FsF).
-- move=> y Ky; apply/near_sets_ofP.
-    move=> ?? AsubB; apply/contra_not; apply AsubB.
-  case: (G y Ky)=> U [V [Ux [Vy UV0]]]; exists U => //.
-  move=> Uy; contradict UV0; apply/negP/set0P; exists y; split => //.
-  exact: nbhs_singleton.
-- move=> y Ky; case: (G y Ky)=> U [V [Ux [Vy UV0]]]; near_simpl.
+  case=> /= U V [Ux Vy] [oU oV UV0].
   pose M := [set U' | nbhs x U' /\ U' `<=` U]; exists (V, M) => //=. 
-    split => //=; rewrite nbhs_simpl; exists M => //=; split.
-    + by move=> U' [].
-    + by move=> U' U'' [] ? ? ? S; split => //; apply: (subset_trans S).
-    + by exists U; split.
-  move=> [z W][/=] Vz [] Wx WU _ Wz.
+    split; first by move: oV; rewrite openE; apply; apply set_mem.
+    rewrite nbhs_simpl; exists M => //=; split.
+    - by move=>?[].
+    - by move=> U' U'' [] ? ? ? S; split => //; apply: (subset_trans S).
+    - by exists U; split => //; move: oU; rewrite openE; apply; apply set_mem.
+  move=> [z W][/=] Vz [] Wx WU Wz.
   contradict UV0; apply/negP/set0P; exists z; split=> //.
   by apply: WU.
 - move=> M [M_near_x MsubX [V MV]] MsubNF.
@@ -6171,6 +6183,11 @@ case (locK (set X) _ (fun U y => ~ U y) (fun U y => ~ U y) FsF).
   apply: subsetC2; rewrite setCK.
   by apply: MsubNF.
 Qed.
+
+Lemma localizing_complete {X : uniformType} (K : set X) (F : set (set X)) :
+  localizing2 K -> Filter F -> cauchy F -> K (lim F).
+Proof.
+
 
 Section ArzelaAscoli.
 Context {X : topologicalType}.
