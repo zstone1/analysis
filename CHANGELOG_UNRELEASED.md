@@ -98,6 +98,13 @@
   + lemma `fsumEFin`
 - in `lebesgue_measure.v`:
   + definition `ErealGenInftyO.R` and lemma `ErealGenInftyO.measurableE`
+- in `classical_sets.v`:
+  + lemma `preimage_range`
+- in `topology.v`
+  + definition `separates_points_from_closed`, `join_product`
+  + lemmas `weak_sep_cvg`, `weak_sep_nbhsE`, `weak_sep_openE`,
+      `join_product_continuous`, `join_product_open`, `join_product_inj`,
+      `join_product_weak`
 
 ### Changed
 - in `topology.v`
