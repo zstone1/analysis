@@ -3131,7 +3131,6 @@ Proof.
 move=> T1 x y /T1 [A [oA [xA yA]]]; exists A; left; split=> //.
 by rewrite nbhsE inE; exists A; do !split=> //; rewrite inE in xA.
 Qed.
-
 Definition close x y : Prop := forall M, open_nbhs y M -> closure M x.
 
 Lemma closeEnbhs x : close x = cluster (nbhs x).
@@ -3202,6 +3201,13 @@ apply: contraPP => /eqP /T_openT2[[/=A B]].
 rewrite !inE => - [xA yB] [Aopen Bopen /eqP AIB_eq0].
 move=> /(_ A B (open_nbhs_nbhs _) (open_nbhs_nbhs _)).
 by rewrite -set0P => /(_ _ _)/negP; apply.
+Qed.
+
+Definition hausdorff_accessible : hausdorff_space T -> accessible_space.
+Proof.
+rewrite open_hausdorff => hsdfT => x y /hsdfT [[U V] [xU yV]] [/= ? ? /eqP].
+rewrite setIC => /disjoints_subset VUc; exists U; repeat split => //. 
+by rewrite inE; apply: VUc; rewrite -inE.
 Qed.
 
 Hypothesis sep : hausdorff_space T.
@@ -6619,6 +6625,20 @@ apply: open_subspaceW.
   apply: open_comp; first by move=> + _; apply: prod_topo_apply_continuous.
   by apply: closed_openC; exact: closed_closure.
 Qed.
+
+Lemma join_product_inj : accessible_space T -> 
+  set_inj [set: T] join_product.
+Proof.
+move=> /accessible_closed_set1 cl1 x y.
+case: (eqVneq x y) => // xny _ _ jxjy.
+have [] := (@sepf [set y] x (cl1 y)); first by exact/eqP.
+move=> i clfxy; suff : join_product x i != join_product y i.
+  by rewrite jxjy => /eqP.
+apply/negP; move: clfxy; apply: contra_not => /eqP; rewrite /join_product => ->.
+by apply subset_closure; exists y.
+Qed.
+
+Search hausdorff_space accessible_space.
 
 End product_embeddings.
 
