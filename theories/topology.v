@@ -3046,6 +3046,15 @@ Qed.
 
 Definition locally_compact (A : set X) := [locally precompact A].
 
+
+Lemma closed_filter (x : X) : 
+  ProperFilter (filter_from [set W | closed W /\ W x] id).
+Proof.
+apply: filter_from_proper; last by move=> i [_ ?]; exists x.
+apply: filter_from_filter; first by exists setT.
+move=> i j [] ? ? [] ? ?; exists (i `&` j) => //; split => //; exact: closedI.
+Qed.
+
 End Precompact.
 
 Section product_spaces.
@@ -3389,6 +3398,50 @@ Lemma cvgi_lim {U} {F} {FF : ProperFilter F} (f : U -> T -> Prop) (l : T) :
 Proof.
 move=> f_prop fl; apply: get_unique => // l' fl'; exact: cvgi_unique _ fl' fl.
 Qed.
+
+Lemma hausdorff_compact_closed_cvg (x : T) (V : set T) : 
+  compact V -> nbhs x V -> 
+  filter_from [set W | closed W /\ W x] id --> x.
+Proof.
+move=> cptV Vx U /= Ux; rewrite nbhs_simpl.
+wlog oU : U Ux / open U.
+  move: Ux; rewrite nbhsE => -[] W [[oW Wx WU]] /(_ W) /=.
+  case => //; first (by exists W; split); move=> O ? OW. 
+  apply: (filterS (subset_trans OW WU)); last by exists O.
+  exact: closed_filter.
+pose P := fun (x : T) (V : set T) => ~ V x.
+have /compact_near_coveringP.1 : compact (V `\` U).
+  apply: (subclosed_compact _ cptV) => //; apply: closedI. 
+    exact: compact_closed.
+  by apply: open_closedC.
+have PF : ProperFilter (filter_from [set W | closed W /\ W x] id).
+  exact: closed_filter.
+move=> /(_ _ _ (fun C y => ~ C y) (powerset_filter_from_filter PF)).
+case; first last.
+move=> D [] DF Dsub [C] DC /( _ _ DC) /subsetCr; rewrite setCI setCK => CVU.
+  apply: (@filterS _ _ _ (C `&` V)); first by move=> t [] /CVU [].
+  apply: filterI; first exact: DF. 
+  by exists V => //; split; first exact: compact_closed; exact: nbhs_singleton.
+move=> y VUy; have : x != y. 
+  by apply/eqP; move: VUy=>/[swap] <-; case=> ?; apply; apply: nbhs_singleton.
+move: sep; rewrite open_hausdorff => hsd => /hsd [[]] .
+move=>/(@open_hausdorff x y).
+    by apply/eqP => E; move: nUy; rewrite -E; apply; apply: nbhs_singleton. 
+  exists (~`C, [set U | U `<=` C]); last by move=> [? ?] [? /subsetC]; exact.
+  split; first by apply: open_nbhs_nbhs; split => //; exact: closed_openC.
+  apply/near_powerset_filter_fromP; first by move=> ? ?; exact: subset_trans.
+  by exists C => //; exists C.
+
+
+Lemma locally_compact_hsdf (x : X) (U : set X) : 
+  hausdorff_space X ->  
+  locally_compact [set: X] ->
+  nbhs x U -> exists V, V `<=` U /\ compact V /\ nbhs x V.
+Proof.
+move=> hsdfX /(_ x I) [V]; rewrite withinET.  nbhsU => /(_ U).
+Print True.
+
+
 
 End separated_topologicalType.
 
@@ -6884,11 +6937,14 @@ Notation "{ 'open' fam , F --> f }" :=
 Definition compact_open {X Y : topologicalType} := 
     { open compact , X -> Y}.
 
-Lemma curry_continuous {X Y Z : topologicalType} 
-    (f : {open compact, (X * Y)%type -> Z}) : 
-  continuous f ->
-  {for f, continuous (curry : {open compact, (X * Y)%type -> Z} -> 
-    {open compact, X -> {open compact, Y -> Z }})}.
+
+Section curry_continuous.
+Context {X Y Z : topologicalType}.
+Let cpt_curry (f : {open compact, (X * Y)%type -> Z}) :  
+   {open compact, X -> {open compact, Y -> Z }} := curry f.
+
+Lemma curry_continuous (f : {open compact, (X * Y)%type -> Z}) : 
+  continuous f -> {for f, continuous cpt_curry}.
 Proof.
 move=> ctsf; apply/cvg_sup; first by apply: fmap_filter; exact: nbhs_filter.
 case=> K cptK U; rewrite nbhs_simpl.
@@ -6900,16 +6956,69 @@ apply: filterS; first by apply: preimage_subset; exact: DU.
 near=> g => /= h [x Kx] <- {h}; move: x Kx; near:g => {U DU}.
 apply: (compact_near_coveringP.1 _ cptK) => /= x Kx.
 have Vfx : V (curry f x) by apply: curryfV; exists x.
+pose C := fun (p : X * {open compact, (X * Y)%type -> Z}) => cpt_curry p.2 p.1.
+suff : {for (x, f), continuous C} by apply; apply: open_nbhs_nbhs; split.
+apply/cvg_sup.
+case=> J cptJ U; rewrite nbhs_simpl.
+rewrite /filter_of nbhsE; case => A [] []; rewrite /open; case=> B Bom <-.
+case=> /= D /[dup] BD /Bom [W oW DW] /= curryfW uBU.
+have DU : D `<=` U by apply: subset_trans; [move=> y Dy | exact: uBU]; exists D.
+rewrite -DW /= in DU curryfW => {B uBU BD Bom DW A D}.
+apply: filterS; first by apply: preimage_subset; exact: DU.
+near=> g => /= h [y Jy] <- {h}; move: y Jy; near:g => {U DU}.
+apply: (compact_near_coveringP.1 _ cptJ) => /= y Jy.
+have : nbhs (x,y) (f @^-1` W).
+  apply:open_nbhs_nbhs; split; first exact: open_comp.
+  by apply: curryfW; exists y.
+case;case=> P Q [] /= Px Qy PQsubW.
 
-have ctsCf : continuous (curry f : {open compact, X -> {open compact, Y -> Z }} ).
+
+
+
+have ctsCf : continuous (cpt_curry f).
   admit.
-have ctsfx : continuous (curry f x).
-  rewrite (_ : curry f x = f \o (fun y => (x,y))); last by exact: funext.
+have ctsfx : continuous (cpt_curry f x).
+  rewrite (_ : cpt_curry f x = f \o (fun y => (x,y))); last by exact: funext.
   move=> y; apply: continuous_comp; last exact: ctsf.
   by apply: cvg_pair; first exact: cvg_cst.
+
+rewrite /C/cpt_curry/curry.
+exists ((cpt_curry f x) @^-1` W, (cpt_curry f) @^-1` V `*`
+  [set g | g @` (K `*` J) `<=` W]).
+split => //=.
+- by apply: ctsfx; apply: open_nbhs_nbhs; split => //; apply: curryfW; exists y.
+- exists ((cpt_curry f) @^-1` V, [set g | g @` (K `*` J) `<=` W]); split => /=.
+  + by apply: ctsCf; apply: open_nbhs_nbhs.
+  + apply: (@open_nbhs_nbhs {open compact, (X * Y)%type -> Z}); split. 
+      apply: (@sup_openW _ (sigT compact) _ _ (exist _ _ (compact_prod cptK cptJ))).
+      exists [set [set g | g @` (K `*` J) `<=` W]]; rewrite ?bigcup_set1 //.
+      by move=> ? ->; exists W.
+    move=> z [[x' y']] [/= Kx' Jy'] <-; apply: curryfW; exists .
+  
+  
+
 have NVx : nbhs x (curry f @^-1` V).
   apply: open_nbhs_nbhs; split => //; first apply open_comp => //.
-  by apply: curryfV; exists x.
+  
+  case
+  admit.
+suff: 
+
+have [/= M [subIM [] Mfx MV]] : nbhs (cpt_curry f x) V by exact: open_nbhs_nbhs.
+case: subIM => O OsubI OME; move: (Mfx); rewrite -OME => [[]] Q /OsubI + Qfx.
+case=> /= I + IQE. move: (Qfx); rewrite -IQE.
+
+
+case: nVfx.
+case:(oV) => O /[swap] OVE; move: (Vfx); rewrite -OVE; case=> M OM cfx Osubf.
+have [I Isub IME] := Osubf M OM.
+apply: (@filterS _ _ _ (fun w => M (curry w.1 w.2))). first by apply/filter_prod_filter/nbhs_filter.
+
+case.
+
+exists ((curry f @^-1` V), setT).
+rewrite -/(prop_near2 x f). {2}/nbhs /=.
+
 
 
 
