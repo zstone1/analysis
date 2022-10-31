@@ -413,6 +413,10 @@ Reserved Notation "{ 'family' fam , U -> V }"
   (at level 0, U at level 69, format "{ 'family'  fam ,  U  ->  V }").
 Reserved Notation "{ 'family' fam , F --> f }"
   (at level 0, F at level 69, format "{ 'family'  fam ,  F  -->  f }").
+Reserved Notation "{ 'open' fam , U -> V }"
+  (at level 0, U at level 69, format "{ 'open'  fam ,  U  ->  V }").
+Reserved Notation "{ 'open' fam , F --> f }"
+  (at level 0, F at level 69, format "{ 'open'  fam ,  F  -->  f }").
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -2390,6 +2394,14 @@ have /sD := DE; rewrite inE => - [i _]; rewrite openE => Eop.
 by apply: (cvFt i); apply: Eop; move: Ct; rewrite -IDeC => /(_ _ DE).
 Qed.
 
+Lemma sup_openW (U : set T) (i : I) : 
+  @open (TS i) U -> @open sup_topologicalType U.
+Proof.
+move=> oU; exists [set U]; rewrite ?bigcup_set1 // => ? ->.
+exists ([fset U])%fset; rewrite ?set_fset1 ?bigcap_set1 //.
+by move=> w /fset1P ->; apply/mem_set; exists i.
+Qed.
+
 End Sup_Topology.
 
 (** ** Product topology *)
@@ -2989,6 +3001,12 @@ move=> /(filterI FAB); rewrite setIUl setICr set0U => FBA.
 have /cptB[x BFx] : F B by apply: filterS FBA; exact: subIsetr.
 by exists x; right.
 Qed.
+
+Lemma compact_prod {Y : topologicalType} (A : set X) (B : set Y) : 
+  compact A -> compact B -> compact (A `*` B).
+Proof.
+Admitted.
+
 
 (* The closed condition here is neccessary to make this definition work in a  *)
 (* non-hausdorff setting.                                                     *)
@@ -6809,6 +6827,167 @@ by move=> A [x _ <-]; exact: compact_set1.
 Qed.
 
 End UniformPointwise.
+
+Section family_open.
+Context {X Y : topologicalType}.
+
+Section open_image.
+Variables (K : set X).
+
+Definition fct_open_image := let _ := K in X -> Y.
+
+Definition open_image_open : set (set fct_open_image) := 
+  (fun U => [set f : X -> Y | f@` K `<=` U]) @` (@open Y).
+
+Program Definition topology_of_open_image_mixin := 
+  @topologyOfBaseMixin _ fct_open_image open_image_open id _ _.
+Next Obligation.
+rewrite -subTset => f _; exists setT => //. 
+by exists setT; [exact openT | rewrite -subTset => g //=].
+Qed.
+Next Obligation. 
+move=> A B t [U oU E1] [V oV E2] /= ? ?; exists (A `&` B); split => //.
+exists (U `&` V); first exact: openI.
+rewrite eqEsubset; split => f; rewrite -E1 -E2 /=.
+  by move=> subUV; split=> y /subUV [].
+by case=> subU subV y; split; [apply: subU | apply: subV].
+Qed.
+
+Canonical fct_open_image_pointed := PointedType fct_open_image (fun=> point).
+Canonical fct_open_image_eq := EqType fct_open_image gen_eqMixin.
+Canonical fct_open_image_choice := ChoiceType fct_open_image gen_choiceMixin.
+
+Let fct_open_image_filtered := Filtered.Class (Pointed.class fct_open_image_pointed)
+  (nbhs_of_open (open_from open_image_open id)).
+
+Canonical fct_open_image_topologicalType := @Topological.Pack fct_open_image
+  (@Topological.Class _ fct_open_image_filtered topology_of_open_image_mixin).
+End open_image.
+
+Variables (family : set (set X)).
+
+Definition fct_family_open := let _ := family in X -> Y.
+Canonical fct_family_open_pointed := PointedType fct_family_open (fun=> point).
+Canonical fct_family_open_eq := EqType fct_family_open gen_eqMixin.
+Canonical fct_family_open_choice := ChoiceType fct_family_open gen_choiceMixin.
+Canonical fct_family_open_topology := 
+  @sup_topologicalType _ (sigT family) (fun i => 
+    Topological.class (fct_open_image_topologicalType (projT1 i))).
+End family_open.
+
+Notation "{ 'open' fam , U -> V }" :=  
+  (@fct_family_open_topology [topologicalType of U] [topologicalType of V] fam).
+Notation "{ 'open' fam , F --> f }" :=
+  (cvg_to [filter of F] (filter_of (Phantom (fct_family_open_topology fam) f)))
+  : classical_set_scope.
+
+Definition compact_open {X Y : topologicalType} := 
+    { open compact , X -> Y}.
+
+Lemma curry_continuous {X Y Z : topologicalType} 
+    (f : {open compact, (X * Y)%type -> Z}) : 
+  continuous f ->
+  {for f, continuous (curry : {open compact, (X * Y)%type -> Z} -> 
+    {open compact, X -> {open compact, Y -> Z }})}.
+Proof.
+move=> ctsf; apply/cvg_sup; first by apply: fmap_filter; exact: nbhs_filter.
+case=> K cptK U; rewrite nbhs_simpl.
+rewrite /filter_of nbhsE; case => A [] []; rewrite /open; case=> B Bom <-.
+case=> /= D /[dup] BD /Bom [V oV DV] /= curryfV uBU.
+have DU : D `<=` U by apply: subset_trans; [move=> x Dx | exact: uBU]; exists D.
+rewrite -DV /= in DU curryfV => {B uBU BD Bom DV A D}.
+apply: filterS; first by apply: preimage_subset; exact: DU.
+near=> g => /= h [x Kx] <- {h}; move: x Kx; near:g => {U DU}.
+apply: (compact_near_coveringP.1 _ cptK) => /= x Kx.
+have Vfx : V (curry f x) by apply: curryfV; exists x.
+
+have ctsCf : continuous (curry f : {open compact, X -> {open compact, Y -> Z }} ).
+  admit.
+have ctsfx : continuous (curry f x).
+  rewrite (_ : curry f x = f \o (fun y => (x,y))); last by exact: funext.
+  move=> y; apply: continuous_comp; last exact: ctsf.
+  by apply: cvg_pair; first exact: cvg_cst.
+have NVx : nbhs x (curry f @^-1` V).
+  apply: open_nbhs_nbhs; split => //; first apply open_comp => //.
+  by apply: curryfV; exists x.
+
+
+
+
+near=> g => h /= [x Kx] <-.
+have : forall x, K x -> 
+
+suff : exists (C : set Y) (W : set Z), 
+    compact C /\ open W /\ f @` (K `*` C) `<=` W /\
+    (forall g, g @` (K`*`C) `<=` W -> curry g @` K `<=` V).
+  case=> C [] W [cptC [oW] []] fKC subV.
+  apply: (@filterS _ _ _ [set g | g @` (K `*` C) `<=` W]).
+    move=> /= g gkcW h /= [z Kz] <-; apply: (subV g) => //; by exists z.
+  apply: (@open_nbhs_nbhs {open compact, X*Y -> Z}); split => //.
+  pose KCc : sigT compact := existT _ _ (compact_prod cptK cptC ).
+  apply (@sup_openW _ _ _ _ KCc); exists [set [set g | g @` (K `*` C) `<=` W]].
+    by move=> U ->; exists W.
+  by rewrite bigcup_set1.
+
+  (*
+pose F := filter_from [set M : set (Y * Z) | exists D W,
+  [/\ M = D `*` W ,
+      open W,
+      compact D &
+      f @` (K `*` D) `<=` W
+  ]] id.
+have FF : Filter F. 
+  apply: filter_from_filter => //.
+    exists set0, set0, set0 => //=; split => //.
+    - by rewrite setM0.
+    - by apply: open0.
+    - exact: compact0.
+    - by move => ? [] ? [] /=.
+  move=> i j [C1][D1][W1][->] ? fw1 ? ? [C2][D2][W2][->] ? fw2 ? ?.
+  exists ((C1 `&` C2) `*` (W1 `&` W2)).
+  exists (C1 `&` C2), (D1 `&` D2), (W1 `&` W2); split => //.
+  - exact: openI.
+  - move=> z [[] x y] /= [Kx] [] c1y c2y <-; split.
+      by apply: fw1; exists (x,y).
+    by apply: fw2; exists (x,y).
+  - by rewrite setCU; apply: setISS.
+  - admit.
+  - 
+  - by rewrite setMI.
+  *)
+    
+have /compact_near_coveringP.1 /(_ _ _ P (powerset_filter_from_filter) FF ) := cptK.
+  forall x, K x -> 
+    exists C W, [set curry f x y | y in C] `<=` W /\ open W.
+  (forall x, K x -> \forall x' \near x & C \near powerset_filter_from F, 
+    fora
+     ) ->
+preimage_subset
+have := forall x, K x -> \
+Search preimage subset.
+have := (forall x, K x -> \forall x' \near x & g \near f, (g x y) ->
+ 
+
+
+case: oV => B Bom E; rewrite -{}E in curryfV. /= E /[dup] BD /Bom [W oW <-] /= curryfV uBV.
+have DU : D `<=` U by apply: subset_trans; [move=> x Dx | exact: uBU]; exists D.
+move => {B uBU BD Bom}.
+
+
+/(@subset_trans _ _ D).
+
+
+
+Notation
+
+Section compact_open.
+
+
+
+
+
+Section 
+Definition open_comp
 
 Section ArzelaAscoli.
 Context {X : topologicalType}.
