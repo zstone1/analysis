@@ -6467,6 +6467,7 @@ Definition countable_uniform_pseudoMetricType_mixin := PseudoMetric.Mixin
 
 End countable_uniform.
 
+
 Section sup_pseudometric.
 Variable (R : realType) (T : pointedType) (Ii : Type).
 Variable (Tc : Ii -> PseudoMetric.class_of R T).
@@ -6498,6 +6499,65 @@ Definition product_pseudoMetricType :=
     Icnt.
 
 End product_pseudometric.
+
+Section urysohn.
+
+Context {T : topologicalType} {R : realType}.
+
+Hypothesis normal : forall (AB : (set T) * (set T)), 
+  closed AB.1 -> closed AB.2 -> AB.1 `&` AB.2 = set0 -> exists UV, 
+  [/\ open UV.1,
+      open UV.2, 
+      AB.1 `<=` UV.1, 
+      AB.2 `<=` UV.2 & 
+      UV.1 `&` UV.2 = set0].
+
+Lemma normal_cl (AB : (set T) * (set T)) : 
+  closed AB.1 -> closed AB.2 -> AB.1 `&` AB.2 = set0 -> exists UV, 
+  [/\ open UV.1,
+      open UV.2, 
+      AB.1 `<=` UV.1, 
+      AB.2 `<=` UV.2 & 
+      closure (UV.1) `&` closure (UV.2) = set0].
+Proof.
+case: AB => A B.
+move=> clA clB AB0; have [[U V] /= [oU oV AU BV UV0]]  := normal clA clB AB0.
+have := @normal ((closure U), B); case => //; first exact: closed_closure.
+  apply: subsetI_eq0; [exact: subset_refl | exact: BV |].
+  apply: contrapT => /eqP/set0P [x [clUx]].
+  by rewrite openE in oV; move/oV/clUx/set0P/eqP.
+case=> U' V' [oU' oV' clUU' BV' U'V'0]; exists (U, V').
+split => //; apply: subsetI_eq0; [exact: clUU' | exact: subset_refl |].
+apply: contrapT => /eqP/set0P [x [+ clV'x]].
+by rewrite openE in oU'; move/oU'/clV'x/set0P/eqP; rewrite setIC.
+Qed.
+
+A U clU clV V B 
+    
+ A U^c            clU  clV             V^c B
+---------       ---------------      ---------
+A U' clU' U clU A' clA' clB' B' clV V clV' V' B 
+
+A U Uc clU A' clA' clB' B' clV V B 
+
+Definition split_normal (AB : (set T)*(set T))  
+    (clA : closed AB.1) (clB : closed AB.2) (AB0 : AB.1 `&` AB.2 = set0) :=
+  let: (U, V) := projT1 (cid (normal_cl clA clB AB0)) in 
+  [set [set:T]].
+
+Fixpoint normal_ent (n : nat) : set (T * T) := 
+  match n with 
+  | O => [set: T*T]
+  | S n => normal_ent n
+  end.
+
+Lemma urysohn : forall (A B : set T), 
+  closed A -> closed B -> A `&` B = set0 -> 
+  exists (f : {fun [set: T] >-> `[0,1]}), 
+    continuous (f : T -> R) /\ f @` A = [set 0] /\ f @` B = [set 1].
+Proof.
+
+
 
 Definition subspace {T : Type} (A : set T) := T.
 Arguments subspace {T} _ : simpl never.
