@@ -242,6 +242,11 @@ Require Import reals signed.
 (*                      component x == the connected component of point x     *)
 (*                    perfect_set A == A is closed, and is every point in A   *)
 (*                                     is a limit point of A.                 *)
+(*           totally_disconnected A == the only connected subsets of A are    *)
+(*                                     singletons or empty.                   *)
+(*               zero_dimensional T == distinct points in T are separable by  *)
+(*                                     clopen set                             *)
+(*                                                                            *)
 (*                      [locally P] := forall a, A a -> G (within A (nbhs x)) *)
 (*                                     if P is convertible to G (globally A)  *)
 (*                                                                            *)
@@ -3645,6 +3650,18 @@ move=> Axy; apply/seteqP; split => z; apply: connected_component_trans => //.
 by apply: connected_component_sym.
 Qed.
 
+Lemma component_closed A x : closed A -> closed (connected_component A x).
+Proof. 
+move=> clA; case : (pselect (A x)); first last.
+  by move=> ?; rewrite connected_component_out //; exact: closed0.
+rewrite closure_id; rewrite eqEsubset; split; first exact: subset_closure.
+move=> z ?; exists (closure (connected_component A x)) => //.
+split; first exact/subset_closure/connected_component_refl.
+  rewrite closure_id in clA; rewrite [R in _ `<=` R]clA.
+  by apply: closure_subset; exact: connected_component_sub.
+by apply: connected_closure; exact: component_connected.
+Qed.
+  
 Lemma clopen_separatedP A : clopen A <-> separated A (~` A).
 Proof.
 split=> [[oA cA]|[] /[!(@disjoints_subset T)] /[!(@setCK T)] clAA AclA].
@@ -3766,6 +3783,7 @@ by move=> ->; have := projT2 (sigW (npts N)).
 Qed.
 
 End perfect_sets.
+
 
 (** * Uniform spaces *)
 
@@ -6863,15 +6881,16 @@ rewrite [RHS]setIUr -V2W -V1W eqEsubset; split=> ?.
 by case=> [][] ? ?; split=> []; [left; split | left | right; split | right].
 Qed.
 
-Lemma subspaceT_continuous {U} A (B : set U) (f : {fun A >-> B}) :
-  {within A, continuous f} -> continuous (f : subspace A -> subspace B).
+Lemma subspaceT_continuous {U} A (B : set U) (f : T -> U) :
+  set_fun A B f -> {within A, continuous f} -> 
+  continuous (f : subspace A -> subspace B).
 Proof.
-move=> /continuousP ctsf; apply/continuousP => O /open_subspaceP [V [oV VBOB]].
-rewrite -open_subspaceIT; apply/open_subspaceP.
+move=> ABf /continuousP ctsf; apply/continuousP => O /open_subspaceP.
+case=> V [oV VBOB]; rewrite -open_subspaceIT; apply/open_subspaceP.
 case/open_subspaceP: (ctsf _ oV) => W [oW fVA]; exists W; split => //.
 rewrite fVA -setIA setIid eqEsubset; split => x [fVx Ax]; split => //.
-- by have /[!VBOB]-[] : (V `&` B) (f x) by split => //; exact: funS.
-- by have /[!esym VBOB]-[] : (O `&` B) (f x) by split => //; exact: funS.
+- by have /[!VBOB]-[] : (V `&` B) (f x) by split => //; exact: ABf.
+- by have /[!esym VBOB]-[] : (O `&` B) (f x) by split => //; exact: ABf.
 Qed.
 
 
@@ -7191,6 +7210,96 @@ have : f @` closure (AfE b) `&` f @` AfE (~~ b) = set0.
   by rewrite fAfE; exact: subsetI_eq0 cEIE.
 by rewrite predeqE => /(_ (f t)) [fcAfEb] _; apply fcAfEb; split; exists t.
 Qed.
+
+
+Section totally_disconnected.
+
+Implicit Types (T : topologicalType).
+
+Definition totally_disconnected {T} (A : set T) := 
+  forall x, A x -> connected_component A x = [set x].
+
+Definition zero_dimensional T := 
+  (forall x y, x != y -> exists (U : set T), [/\ clopen U, U x & ~ U y]).
+
+Lemma totally_disconnected_prod (I : choiceType) 
+  (T : I -> topologicalType) (A : forall i, (set (T i))) :
+  (forall i, totally_disconnected (A i)) ->
+  @totally_disconnected (product_topologicalType T) 
+    (fun f => forall i, A i (f i)).
+Proof.
+move=> dsctAi x /= Aix; rewrite eqEsubset.
+split; last by move=> ? ->; apply:connected_component_refl.
+move=> f /= [C /= [Cx CA ctC Cf]]; apply/functional_extensionality_dep => i.
+have : (proj i @` C) `<=` [set x i].
+  rewrite -(dsctAi i) => // ? ?; exists (proj i @` C) => //.
+  split; [by exists x | by move=> ? [r Cr <-]; apply: CA |].
+  apply: connected_continuous_connected => //; apply: continuous_subspaceT.
+  exact: proj_continuous.
+by apply; exists f.
+Qed.
+
+Lemma zero_dimension_prod (I : choiceType) 
+  (T : I -> topologicalType) :
+  (forall i, zero_dimensional (T i)) ->
+  zero_dimensional (product_topologicalType T).
+Proof.
+move=> dctTI /= x y /eqP xneqy.
+have [i/eqP/dctTI [U [? Ux nUy]]] : 
+    exists i, x i <> y i.
+  by apply/existsNP=> W; exact/xneqy/functional_extensionality_dep.
+exists (proj i @^-1` U); split => //; apply clopen_comp => //.
+exact/proj_continuous.
+Qed.
+
+Lemma discrete_zero_dimension {T} :
+  discrete_space T -> zero_dimensional T.
+Proof.
+move=> dctT x y xny; exists [set x]; split => //.
+  split; [exact: discrete_open | exact: discrete_closed].
+by move=> E; rewrite E in xny; move/eqP: xny.
+Qed.
+
+Lemma zero_dimension_totally_disconnected {T}  : 
+  zero_dimensional T -> totally_disconnected [set: T].
+Proof.
+move=> zdA x Ax; rewrite eqEsubset.
+split; last by move=> ? ->; apply:connected_component_refl.
+move=> z ctdAz; apply: contrapT => /eqP znx. 
+have [U [[+ +] Uz nUx]] := zdA _ _  znx.
+move=> ? ?; case: ctdAz => R [Rx RA ctdR Rz]; suff : R `&` U = R.
+  by move=> E; move: Rx; rewrite -E; case.
+by move/setIidl : RA => RA; apply: ctdR; [by exists z | exists U | exists U].
+Qed.
+
+Lemma totally_disconnected_cvg {T : topologicalType} (x : T) : 
+  hausdorff_space T -> zero_dimensional T -> compact [set: T] ->
+  filter_from [set D : (set T) | D x /\ clopen D] id --> x.
+Proof.
+pose F := filter_from [set D : set T | D x /\ open D /\ closed D] id.
+have PF : ProperFilter F. 
+  apply: filter_from_proper; first apply: filter_from_filter.
+  - by exists setT; split => //; split => //; exact: openT.
+  - move=> A B [? [] ? ?] [? [] ? ?]; exists (A `&` B) => //.
+    by split => //; split; [exact: openI | exact: closedI].
+  - by move=> ? [? _]; exists x.
+move=> hsdfT zdT cmpT U Ux; rewrite nbhs_simpl -/F. 
+wlog oU : U Ux / @open T U.
+  move: Ux; rewrite /= nbhsE; case=> V [? ?] /filterS + /(_ V) P. 
+  by apply; apply: P => //; exists V.
+have /(iffLR (compact_near_coveringP _)): @compact T (~`U).
+  by apply: (subclosed_compact _ cmpT) => //; exact: open_closedC.
+move=> /( _ _ _ (fun C y => ~ C y) (powerset_filter_from_filter PF)); case.
+  move=> y nUy; have /zdT [C [[? cC] Cx ?]] : x != y.
+    by apply/eqP => E; move: nUy; rewrite -E; case; have := nbhs_singleton Ux. 
+  exists ((~`C), [set U | U `<=` C]); first split.
+  - by apply: open_nbhs_nbhs; split => //; exact: closed_openC.
+  - apply/near_powerset_filter_fromP; first by move=> ? ?; exact: subset_trans.
+    by simpl; exists C => //; exists C.
+  - by case=> i j [? /subsetC]; apply. 
+by move=> D [] DF Dsub [C] DC /(_ _ DC) /subsetC2/filterS; apply; exact: DF.
+Qed.
+End totally_disconnected.
 
 Lemma uniform_limit_continuous {U : topologicalType} {V : uniformType}
     (F : set (set (U -> V))) (f : U -> V) :
