@@ -110,6 +110,8 @@
 - in `probability.v`
   + `variance` is now defined based on `covariance` 
 
+- moved `subsetP` from `functions.v` to `classical_sets.v`
+
 ### Renamed
 
 - in `derive.v`:
