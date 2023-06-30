@@ -3551,6 +3551,14 @@ by apply: ge0_ae_eq_integral => //; [exact: measurable_funeneg|
                                      exact: measurable_funeneg].
 Qed.
 
+Lemma negligible_integral0 (N : set T) (f : T -> \bar R) :
+  measurable N -> measurable_fun N f ->
+  (forall x, N x -> 0 <= f x) -> mu N = 0 -> \int[mu]_(x in N) f x = 0.
+Proof.
+move => ? ? fpos mn0; rewrite (@ge0_ae_eq_integral N f (cst 0)) ?integral0 //.
+by exists N; split => // z /= => /not_implyP [].
+Qed.
+
 End ae_eq_integral.
 Arguments ae_eq_integral {d T R mu D} g.
 
@@ -4089,6 +4097,14 @@ Section integral_ae_eq.
 Local Open Scope ereal_scope.
 Context d (T : measurableType d) (R : realType) (mu : {measure set T -> \bar R}).
 
+Lemma measure_fin_numIl (A B : set T) :
+  measurable A -> measurable B -> mu A \is a fin_num ->
+  mu (A `&` B) \is a fin_num.
+Proof.
+move=> ? ?; rewrite !ge0_fin_numE // => finA; apply: (le_lt_trans _ finA).
+by apply: le_measure; rewrite ?inE //; apply: measurableI.
+Qed.
+
 Let integral_measure_lt (D : set T) (mD : measurable D) (g f : T -> \bar R) :
   mu.-integrable D f -> mu.-integrable D g ->
   (forall E, measurable E -> \int[mu]_(x in E) f x = \int[mu]_(x in E) g x) ->
@@ -4155,6 +4171,66 @@ rewrite h set_neq_lt setIUr measureU//.
 Qed.
 
 End integral_ae_eq.
+
+Section ae_integral_nonpos.
+
+Local Open Scope ereal_scope.
+Context d (T : measurableType d) (R : realType)
+        (mu : {measure set T -> \bar R}).
+Lemma negligible_integral0_npos (N : set T) (f : T -> \bar R) :
+  measurable N -> measurable_fun N f ->
+  mu N = 0 -> \int[mu]_(x in N) f x = 0.
+Proof.
+Admitted.
+End ae_integral_nonpos.
+
+Section lebesgue_differentiation.
+Context (R : realType).
+Let mu := @lebesgue_measure R.
+Let R' := [the measurableType _ of measurableTypeR R].
+Let nearly (x : R) (n : nat) : set R' := `[x - n%:R^-1, x + n%:R^-1].
+Let int_avg (f : R -> R) (D : set R) (x : R) (n : nat) := 
+  (1/(fine (mu (D `&` nearly x n)))) *
+  \int[mu]_(z in D `&` nearly x n) (f z - f x).
+
+Local Open Scope ereal_scope.
+Lemma lebesgue_diff_cts (D : set R) (eps : R) (f : R -> R) (x : R) :
+  (0 < eps)%R -> (forall x, 0 <= f x )%R ->
+  compact D -> measurable D -> mu D < +oo -> 
+  {within D, continuous f} -> int_avg f D x @ \oo --> (GRing.zero R).
+Proof.
+move: eps => _/posnumP[eps] fpos cptD mD finD ctsf.
+have fD : mu D \is a fin_num by rewrite ge0_fin_numE.
+have mnN y n : measurable (nearly y n) by exact: measurable_itv.
+have mf : measurable_fun D f by exact: subspace_continuous_measurable_fun.
+have mEf : measurable_fun D (EFin \o f) by exact/EFin_measurable_fun.
+apply/(@cvgr0Pnorm_le R [pseudoMetricNormedZmodType R of R^o]).
+move=> _/posnumP[del]; near=> N.
+rewrite /int_avg ?normrM normr1 mul1r normfV ger0_norm ?fine_ge0 //.
+case: (pselect (fine (mu (D `&` nearly x N)) = 0)%R).
+  move=> /[dup] MN0 /eqP; rewrite fine_eq0 //; last exact: measure_fin_numIl.
+  rewrite /Rintegral /=.
+  have /= -> // := (@negligible_integral0_npos _ R' R mu (D `&` nearly x N)
+    (fun z => (f z - f x)%:E)).
+  - by rewrite /= normr0 mulr0.
+  - exact: measurableI.
+  - apply/ EFin_measurable_fun; apply: measurable_funB => //.
+    exact: (measurable_funS _ _ mf).
+  - by apply/eqP; move/eqP: MN0; rewrite fine_eq0 //; apply: measure_fin_numIl.
+move=> ?.
+
+
+Search (_ ^-1 * _ <= _)%R.
+Search GRing.inv normr.
+.
+rewrite /int_avg /= /Rintegral /=.
+Search ball cvg_to.
+Search (_ --> 0%R).
+Search integral (_ <= _).
+Search (_ <= _) 
+
+
+
 
 (******************************************************************************)
 (* * product measure                                                          *)
