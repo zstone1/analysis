@@ -4184,22 +4184,51 @@ Proof.
 Admitted.
 End ae_integral_nonpos.
 
+Section lusin.
+Hint Extern 0  (hausdorff_space _) =>
+  (exact: Rhausdorff ) : core.
+Local Open Scope ereal_scope.
+Context  (rT : realType) (A : set rT).
+Let mu := @lebesgue_measure rT.
+Let R  := [the measurableType _ of measurableTypeR rT].
+Hypothesis mA : measurable A.
+Hypothesis finA : (mu A < +oo).
+
+Lemma measurable_almost_continuous (f : R -> R) (eps : rT) :
+  (0 < eps)%R -> measurable_fun A f -> exists K, 
+  [/\ compact K, K `<=` A, mu (A `\` K) < eps%:E & 
+  {within K, continuous f}].
+Proof.
+Admitted.
+End lusin.
+
+Section topology_gen.
+Context {R : realType} {M : pseudoMetricType R}.
+Lemma nbhsx_ballxp (x : M) (eps : R) : 0 < eps -> nbhs x (ball x eps).
+Proof. by move: eps => _/posnumP[eps]; exact: nbhsx_ballx. Qed.
+End topology_gen.
+
 Section lebesgue_differentiation.
 Context (R : realType).
-Let mu := @lebesgue_measure R.
 Let R' := [the measurableType _ of measurableTypeR R].
+Let mu := [the measure _ _ of @lebesgue_measure R].
 Let nearly (x : R) (n : nat) : set R' := `[x - n%:R^-1, x + n%:R^-1].
 Let int_avg (f : R -> R) (D : set R) (x : R) (n : nat) := 
-  (1/(fine (mu (D `&` nearly x n)))) *
-  \int[mu]_(z in D `&` nearly x n) (f z - f x).
+  ((1/(fine (mu (D `&` nearly x n)))) *
+  \int[mu]_(z in D `&` nearly x n) (f z - f x))%R.
+
+Lemma int_split (A B : set R) f: 
+  (\int[mu]_(z in A) f z) + (\int[mu]_(z in B) f z) = 
+  (\int[mu]_(z in A `|` B) f z).
+Proof.
+Admitted.
 
 Local Open Scope ereal_scope.
-Lemma lebesgue_diff_cts (D : set R) (eps : R) (f : R -> R) (x : R) :
-  (0 < eps)%R -> (forall x, 0 <= f x )%R ->
-  compact D -> measurable D -> mu D < +oo -> 
+Lemma lebesgue_diff_cts (D : set R) (f : R -> R) (x : R) :
+  (forall x, 0 <= f x )%R -> compact D -> measurable D -> mu D < +oo -> 
   {within D, continuous f} -> int_avg f D x @ \oo --> (GRing.zero R).
 Proof.
-move: eps => _/posnumP[eps] fpos cptD mD finD ctsf.
+move=> fpos cptD mD finD ctsf.
 have fD : mu D \is a fin_num by rewrite ge0_fin_numE.
 have mnN y n : measurable (nearly y n) by exact: measurable_itv.
 have mf : measurable_fun D f by exact: subspace_continuous_measurable_fun.
@@ -4218,10 +4247,71 @@ case: (pselect (fine (mu (D `&` nearly x N)) = 0)%R).
     exact: (measurable_funS _ _ mf).
   - by apply/eqP; move/eqP: MN0; rewrite fine_eq0 //; apply: measure_fin_numIl.
 move=> ?.
+Admitted.
+
+Lemma near_integrable0 (D : set R) (f : R -> \bar R) :
+  measurable D -> mu D < +oo -> mu.-integrable D f -> 
+  (forall (eps : R), (0 < eps)%R -> exists (del : R),
+    (0 < del)%R /\ forall V, mu V < del%:E -> `|\int[mu]_(z in V `&` D) (f z)| < del%:E
+  ).
+Proof.
+Admitted.
+
+Lemma lebesgue_diff_measurable (D : set R) (f : R -> R) (x : R) :
+  (forall x, 0 <= f x )%R ->
+  measurable D -> mu D < +oo -> 
+  measurable_fun D f -> 
+  mu.-integrable D (EFin \o f) -> 
+  int_avg f D x @ \oo --> (GRing.zero R).
+Proof.
+move=> fpos mD finD mf intf.
+apply/(@cvgr0Pnorm_le R [pseudoMetricNormedZmodType R of R^o]).
+move=> _/posnumP[del].
+have := @near_integrable0 D (EFin \o f) mD finD intf (del%:num /2) (ltac:(done)).
+case => + [] => _/posnumP[eta] etaIntf.
+have := @measurable_almost_continuous R _ mD finD f (eta %:num) (ltac:(done)) mf.
+case=> Kn [cptKn KnD lmdel fctsN].
+have mKn : measurable Kn.
+  by apply: closed_measurable; apply: compact_closed => //; exact: Rhausdorff.
+have finKn : mu Kn < +oo.
+  by apply: (le_lt_trans _ finD); apply: le_measure; rewrite ?inE //.
+have := @lebesgue_diff_cts Kn f x fpos cptKn mKn finKn fctsN.
+move=> /(_ (interior (ball (0%R : R^o) (del%:num/2)))) /= [].
+  apply: open_nbhs_nbhs; split; first exact: open_interior.
+  exact: nbhsx_ballxp.
+move => N _ Navgb. 
+have := nbhs_infty_ge N; apply: filter_app.
+near=> t => /Navgb /= /interior_subset /=.
+rewrite /ball /= distrC subr0 => kNxt.
+rewrite /int_avg.
+have mnN y n : measurable (nearly y n) by exact: measurable_itv.
+have fD : mu D \is a fin_num by rewrite ge0_fin_numE.
+case: (pselect (fine (mu (D `&` nearly x t)) = 0)%R).
+  move=> /[dup] MN0 /eqP; rewrite fine_eq0 //; last apply: measure_fin_numIl.
+  rewrite /Rintegral /=.
+  have /= -> // := (@negligible_integral0_npos _ R' R mu (D `&` nearly x t)
+    (fun z => (f z - f x)%:E)).
+  - rewrite /= mulr0 normr0 //.
+  - exact: measurableI.
+  - apply/ EFin_measurable_fun; apply: measurable_funB => //.
+    exact: (measurable_funS _ _ mf).
+  - by apply/eqP; move/eqP: MN0; rewrite fine_eq0 //; apply: measure_fin_numIl.
+  - done. 
+  - done.
+  - done.
+move=> Dtn0.
+rewrite normrM div1r normfV ler_pdivr_mull; first last.
+  rewrite lt0r; apply/andP; split => //.
+  by move/eqP: Dtn0; apply: contra_neq => /normr0_eq0.
+have Dkn : D `&` nearly x t = 
+    ((D `&` nearly x t) `&` Kn) `|` 
+    ((D `&` nearly x t)`\` Kn). 
+  admit.
+rewrite {1}Dkn.
+rewrite -int_split.
 
 
-Search (_ ^-1 * _ <= _)%R.
-Search GRing.inv normr.
+
 .
 rewrite /int_avg /= /Rintegral /=.
 Search ball cvg_to.
