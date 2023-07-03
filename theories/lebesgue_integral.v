@@ -4182,6 +4182,13 @@ Lemma negligible_integral0_npos (N : set T) (f : T -> \bar R) :
   mu N = 0 -> \int[mu]_(x in N) f x = 0.
 Proof.
 Admitted.
+
+Lemma pos_measure_le (D1 D2 : set T) : 
+   measurable D1 -> measurable D2 -> D1 `<=` D2 -> mu D2 < +oo -> mu D1 < +oo.
+Proof.
+by move=> mD1 mD2 /le_measure P /le_lt_trans; apply; apply: P; rewrite ?inE.
+Qed.
+
 End ae_integral_nonpos.
 
 Section lusin.
@@ -4208,24 +4215,91 @@ Lemma nbhsx_ballxp (x : M) (eps : R) : 0 < eps -> nbhs x (ball x eps).
 Proof. by move: eps => _/posnumP[eps]; exact: nbhsx_ballx. Qed.
 End topology_gen.
 
+Section mu2.
+Local Open Scope ereal_scope.
+Lemma measureU2 d (T : ringOfSetsType d) (R : realFieldType) (A B : set T)
+   (mu : {measure set T -> \bar R}):
+    measurable A -> measurable B -> mu (A `|` B) <= mu A + mu B%E.
+Proof.
+move=> ? ?; rewrite (@measureDI d R T mu (A`|`B) B) //; last exact: measurableU.
+apply: lee_add; apply: le_measure; rewrite ?inE //.
+- by apply: measurableD => //; exact: measurableU.
+- by rewrite setDUl setDv setU0.
+- by apply: measurableI => //; exact: measurableU.
+Qed.
+End mu2.
+
+Section Cvg_switch.
+Context {T1 T2 : choiceType}.
+
+Local Notation "'to_set' A x" := ([set y | A (x, y)])
+  (at level 0, A at level 0) : classical_set_scope.
+Local Notation "A ^-1" := ([set xy | A (xy.2, xy.1)]) : classical_set_scope.
+
+Lemma cvg_switch_1_near {U : uniformType}
+  F1 {FF1 : ProperFilter F1} F2 {FF2 : Filter F2}
+  (f : T1 -> T2 -> U) (g : T2 -> U) (h : T1 -> U) (l : U) :
+  f @ F1 --> g -> (\forall x1 \near F1, f x1 @ F2 --> h x1) -> h @ F1 --> l ->
+  g @ F2 --> l.
+Proof.
+move=> fg fh hl; apply/cvg_app_entourageP => A entA.
+near F1 => x1; near=> x2; apply: (entourage_split (h x1)) => //.
+  by near: x1; apply/(hl (to_set _ l)) => /=.
+apply: (entourage_split (f x1 x2)) => //.
+  near: x2; near: x1; move: fh; apply: filter_app; apply: nearW => z fh1. 
+  by apply/(fh1 (to_set _ _)) => /=.
+move: (x2); near: x1. 
+  have /cvg_fct_entourageP /(_ (_^-1%classic)):= fg; apply.
+exact: entourage_inv.
+Unshelve. all: by end_near. Qed.
+
+Lemma cvg_switch_2_near {U : completeType}
+  F1 {FF1 : ProperFilter F1} F2 {FF2 : ProperFilter F2}
+  (f : T1 -> T2 -> U) (g : T2 -> U) (h : T1 -> U) :
+  f @ F1 --> g -> (\forall x \near F1, f x @ F2 --> h x) ->
+  [cvg h @ F1 in U].
+Proof.
+move=> fg fh; apply: cauchy_cvg => A entA.
+rewrite !near_simpl -near2_pair near_map2; near=> x1 y1 => /=; near F2 => x2.
+apply: (entourage_split (f x1 x2)) => //.
+  near: x2; near: x1; move: (fh); apply: filter_app; apply: nearW => z fh1. 
+  by apply/(fh1 (to_set _ _)) => /=.
+apply: (entourage_split (f y1 x2)) => //; last first.
+  near: x2; near: y1; move: (fh); apply: filter_app; apply: nearW => z fh1. 
+  apply/ (fh1 (to_set ((_^-1)%classic) _)).
+  exact: nbhs_entourage (entourage_inv _).
+apply: (entourage_split (g x2)) => //; move: (x2); [near: x1|near: y1].
+  have /cvg_fct_entourageP /(_ (_^-1)%classic) := fg; apply.
+  exact: entourage_inv.
+by have /cvg_fct_entourageP := fg; apply.
+Unshelve. all: by end_near. Qed.
+
+Lemma cvg_switch_near {U : completeType}
+  F1 (FF1 : ProperFilter F1) F2 (FF2 : ProperFilter F2)
+  (f : T1 -> T2 -> U) (g : T2 -> U) (h : T1 -> U) :
+  f @ F1 --> g -> (\forall x1 \near F1, f x1 @ F2 --> h x1) ->
+  exists l : U, h @ F1 --> l /\ g @ F2 --> l.
+Proof.
+move=> Hfg Hfh; have hcv := !! cvg_switch_2_near Hfg Hfh.
+by exists [lim h @ F1 in U]; split=> //; apply: cvg_switch_1_near Hfg Hfh hcv.
+Qed.
+End Cvg_switch.
+
+Require Import nsatz_realtype.
 Section lebesgue_differentiation.
 Context (R : realType).
 Let R' := [the measurableType _ of measurableTypeR R].
 Let mu := [the measure _ _ of @lebesgue_measure R].
 Let nearly (x : R) (n : nat) : set R' := `[x - n%:R^-1, x + n%:R^-1].
-Let int_avg (f : R -> R) (D : set R) (x : R) (n : nat) := 
-  ((1/(fine (mu (D `&` nearly x n)))) *
-  \int[mu]_(z in D `&` nearly x n) (f z - f x))%R.
 
-Lemma int_split (A B : set R) f: 
-  (\int[mu]_(z in A) f z) + (\int[mu]_(z in B) f z) = 
-  (\int[mu]_(z in A `|` B) f z).
-Proof.
-Admitted.
+Let int_avg2 (f : R -> R) (x : R) (n : nat) := 
+  ((n%:R/2) *
+  \int[mu]_(z in nearly x n) (f z))%R.
 
 Local Open Scope ereal_scope.
-Lemma lebesgue_diff_cts (D : set R) (f : R -> R) (x : R) :
-  (forall x, 0 <= f x )%R -> compact D -> measurable D -> mu D < +oo -> 
+(*
+Lemma lebesgue_diff_cts' (D : set R) (f : R -> R) (x : R) :
+  (forall x, 0 <= f x)%R -> compact D -> measurable D -> mu D < +oo -> 
   {within D, continuous f} -> int_avg f D x @ \oo --> (GRing.zero R).
 Proof.
 move=> fpos cptD mD finD ctsf.
@@ -4248,6 +4322,19 @@ case: (pselect (fine (mu (D `&` nearly x N)) = 0)%R).
   - by apply/eqP; move/eqP: MN0; rewrite fine_eq0 //; apply: measure_fin_numIl.
 move=> ?.
 Admitted.
+*)
+
+Lemma lebesgue_diff_simple (D : set R) (f : {sfun R' >-> R}) :
+  open D -> mu D < +oo -> 
+  {ae mu, forall x, D x -> int_avg2 f x @ \oo --> f x}.
+Proof.
+Admitted.
+
+Lemma lebesgue_diff_cts (D : set R) (f : R -> R) :
+  (forall x, 0 <= f x)%R -> open D -> mu D < +oo -> 
+  {within D, continuous f} -> {ae mu, forall x, D x -> int_avg2 f x @ \oo --> f x}.
+Proof.
+Admitted.
 
 Lemma near_integrable0 (D : set R) (f : R -> \bar R) :
   measurable D -> mu D < +oo -> mu.-integrable D f -> 
@@ -4257,14 +4344,168 @@ Lemma near_integrable0 (D : set R) (f : R -> \bar R) :
 Proof.
 Admitted.
 
+Lemma Rext_hausdorff : hausdorff_space ([topologicalType of \bar R]).
+Proof.
+Admitted.
+
+Lemma invr_le_invr (a b : R) : 
+  (0 < a -> 0 < b -> a <= b -> b^-1 <= a^-1)%R.
+Proof.
+Admitted.
+
+Lemma restrict_EfinE (D : set R) (f : R -> R) z : 
+  (f \_ D z)%:E = (EFin \o f) \_ D z.
+Proof.
+Admitted.
+
+Lemma mulr_subE (a b x y : R) : 
+  (x * y - a * b = (x * (y - b)) + (b * (x - a)))%R.
+Proof.
+have axx : (a = x - (x - a))%R.
+  by rewrite opprB addrC -addrA [(- _ + _)%R]addrC subrr addr0.
+by rewrite {1}axx mulrBl opprB addrCA -mulrBr addrC [(_ * b)%R]mulrC. 
+Qed.
 Lemma lebesgue_diff_measurable (D : set R) (f : R -> R) (x : R) :
   (forall x, 0 <= f x )%R ->
-  measurable D -> mu D < +oo -> 
-  measurable_fun D f -> 
-  mu.-integrable D (EFin \o f) -> 
-  int_avg f D x @ \oo --> (GRing.zero R).
+  open D -> mu D < +oo ->
+  measurable_fun D f ->
+  mu.-integrable D (EFin \o f) ->
+  {ae mu, forall x, D x -> int_avg2 f x @ \oo --> f x}.
 Proof.
 move=> fpos mD finD mf intf.
+have Kn' (n : nat) : exists K, 
+    [/\ measurable K, K `<=` D, mu (D `\` K) < (n.+1%:R^-1)%:E,  
+    {within K, continuous f} & forall x, K x -> int_avg2 f K x @ \oo --> f x].
+  have [//| K [cptK KD KDD ctsKf]] := @measurable_almost_continuous R _ mD finD f (n.+1%:R^-1) _  mf.
+  have ? : measurable K.
+    by apply: closed_measurable; apply: compact_closed => //; exact: Rhausdorff.
+  have [] := lebesgue_diff_cts fpos cptK _ ctsKf.
+    by apply: (@pos_measure_le _ _ _ mu _ _ _ _ KD) => //.
+  move=> N [mN N0 /subsetC nintfN]; exists (K`\`N); split => //.
+  - exact: measurableD.
+  - by move=> ? [/KD].
+  - rewrite setDDr; apply: le_lt_trans; first apply: measureU2 => //.
+      exact: measurableD.
+      exact: measurableI.
+    suff -> : (mu (D `&` N) = 0) by rewrite adde0.
+    by apply: (subset_measure0 _ _ _ N0) => //; apply: measurableI.
+  - by apply: (continuous_subspaceW _ ctsKf) => ? [].
+  move=> /= z [Kz /nintfN]; rewrite setCK /= => /(_ Kz). 
+  by rewrite (@int_avg2_mu0E K N) //.
+pose K_ (n : nat) := projT1 (cid (Kn' n)).
+have mKn n : measurable (K_ n) by have [] := projT2 (cid (Kn' n)).
+have KnD n : K_ n `<=` D by have [] := projT2 (cid (Kn' n)).
+have KDD n : mu (D `\` K_ n) <  (n.+1%:R^-1)%:E by have [] := projT2 (cid (Kn' n)).
+have Kcts n : forall x, (K_ n) x -> int_avg2 f (K_ n) x @ \oo --> f x.
+  by have [] := projT2 (cid (Kn' n)).
+wlog kinc : K_ mKn KnD KDD Kcts / nondecreasing_seq K_.
+  admit.
+pose g_ (n : nat) := EFin \o (f \_(K_ n)).
+have mg n : measurable_fun D (g_ n).
+  apply/EFin_measurable_fun; apply/(measurable_restrict _ (mKn n)) => //.
+  exact: (measurable_funS _ (KnD n)).
+have DK0 : (mu (D `\` \bigcup_n K_ n) = 0).
+  rewrite -bigcupDr; last by exists point.
+  suff : ((fun n => mu (D `\` K_ n)) @ \oo --> mu (\bigcap_i (D `\` K_ i))).
+    move/cvg_unique; apply => //=; rewrite //= nbhs_simpl.
+    apply/fine_cvgP; split => //.
+      near=> n; rewrite ge0_fin_numE //; apply/(lt_trans (KDD n))/ltry.
+    apply/(@cvgr0Pnorm_le R [pseudoMetricNormedZmodType R of R^o]).
+    move=> _/posnumP[eps]; have [// | N] := @ltr_add_invr R 0%R eps%:num.
+    rewrite add0r => Neps; exists N => //.
+    move=> n Nn /=; apply: ltW; apply: (le_lt_trans _ Neps).
+    rewrite ger0_norm; first last. 
+      rewrite -/(fine 0); apply: fine_le; rewrite // ge0_fin_numE //.
+      by apply: (lt_trans (KDD _)); rewrite ltry.
+    apply: ltW; rewrite -/(fine (N.+1%:R^-1%:E)); apply: fine_lt => //.
+      by rewrite ge0_fin_numE //; apply: (lt_trans (KDD _)); rewrite ltry.
+    apply: (lt_le_trans (KDD _)); rewrite lee_fin; apply: invr_le_invr => //.
+    by rewrite ler_nat.
+  apply: nonincreasing_cvg_mu => //.
+  + by apply: (lt_trans (KDD _)); rewrite ltry.
+  + by move=> i; apply: measurableD => //; apply: mKn.
+  + apply: bigcap_measurable; by move=> i _; apply: measurableD => //; apply: mKn.
+  + by move=> n m NM; apply/asboolP; apply: setDS; apply/asboolP; apply: kinc.
+exists (D`\` (\bigcup_n K_ n)); split => //.
+    apply: measurableD => //; apply: bigcup_measurable => ? ?; exact: mKn.
+move=> z /= /not_implyP [Dz ngz]; split => //; move: ngz.
+apply: contra_not; case=> N _ Knz; rewrite /int_avg2.
+pose h1 (n m : nat) := 
+  (1 / fine (lebesgue_measure ((K_ n) `&` nearly z m)) *
+  \int[mu]_(z0 in (K_ n) `&` nearly z m) (f) z0)%R.
+pose h2 (m : nat) := 
+  (1 / fine (lebesgue_measure (D `&` nearly z m)) *
+  \int[mu]_(z0 in (D`&` nearly z m)) f z0)%R.
+pose h3 (n : nat) := f z.
+have := @cvg_switch_near _ _ _ _ eventually_filter _ eventually_filter h1
+  h2 h3.
+rewrite /h1 /h2 /h3.
+case.
+- apply/cvg_fct_entourageP => E. 
+  rewrite -entourage_from_ballE; case => _/posnumP[eps].
+  move=> ballEeps.
+  near_simpl; near=> n => m; apply: ballEeps.
+  rewrite /= /ball /= mulr_subE.
+  apply: le_lt_trans; first exact: ler_norm_add.
+  rewrite [_%:num]splitr; apply: ltr_add.
+
+(*
+  apply: cvgM; first exact: cvg_cst.
+  have [] // := @dominated_convergence _ _ R mu (D `&` nearly z n) _ g_ (EFin \o f) (abse \o (EFin \o f)).
+  - apply: measurableI => //; exact: measurable_itv.
+  - by move=> t; apply: (measurable_funS _ _ (mg t)) => //.
+  - by apply/EFin_measurable_fun; apply: (measurable_funS _ _ mf).
+  - exists (D `\` (\bigcup_n K_ n)); split => //.
+      apply: measurableD => //; apply: bigcup_measurable => ? ?; exact: mKn.
+    move=> t /= /not_implyP [[Dt nzt] ngz]; split => //; move: ngz.
+    apply: contra_not; case=> M _ KNz U /nbhs_singleton Uf; rewrite /g_.
+    exists M => // w /= wM; rewrite patchT // ?inE. move: t KNz { nzt Dt Uf}.
+    by apply/asboolP; exact: kinc.
+  - apply:integrable_abse; apply: (integrableS _ _ _ intf) => //.
+    by apply: measurableI => //; exact: measurable_itv.
+  - exists (D`\` (\bigcup_n K_ n)); split => //.
+      apply: measurableD => //; apply: bigcup_measurable => ? ?; exact: mKn.
+    move=> t /= /existsNP [M] /not_implyP [[Dt nzt] ngt]; split => //; move: ngt.
+    apply: contra_not; case=> ? ? ?; rewrite lee_fin. 
+    by rewrite ?ger0_norm // /patch; case: (t \in K_ M) => //.
+  move=> /= _ Knf0 /[dup] g_to_f U.
+  rewrite /Rintegral /=.
+  apply:fine_cvg; apply: (cvg_trans U); rewrite fineK //.
+  apply: integral_fune_fin_num. 
+    by apply: measurableI => //; exact: measurable_itv.
+  apply: (integrableS _ _ _ intf) => //.
+  by apply: measurableI => //; exact: measurable_itv.
+  *)
+  admit.
+- exists N => // n Nn; apply: Kcts.
+  by move: z Knz {Dz h1 h2 h3}; apply/asboolP; apply: kinc.
+move=> l [cstl]; suff -> : l = f z.
+  apply.
+apply: (@cvg_unique _ _ (h3 @\oo)) => //; first exact: Rhausdorff.
+apply: cvg_cst.
+Qed.
+  
+
+have : lim (int_avg2 f D z @ \oo) = f z.
+  rewrite /int_avg2 /=.
+  under eq_fun => y.
+  rewrite integral_mkcondr.
+  rewrite -glim.
+  
+cvg_map_lim
+apply/ cvg_lim.
+rewrite integral_mkcondr.
+rewrite /int_avg2. 
+
+
+apply: 
+have K_ (eps : R) := projT1 (cid (Kn' eps)).
+have := @cvg_switch .
+have : 
+apply: cvg_switch.
+  
+have Kn := measurable_almost_continuous R _ mD finD f (eta %:num) (ltac:(done)) mf.
+  
 apply/(@cvgr0Pnorm_le R [pseudoMetricNormedZmodType R of R^o]).
 move=> _/posnumP[del].
 have := @near_integrable0 D (EFin \o f) mD finD intf (del%:num /2) (ltac:(done)).
