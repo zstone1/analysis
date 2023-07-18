@@ -1650,31 +1650,21 @@ Section pseudometric_normal.
 
 Context {R : realType} {X : pseudoMetricType R}.
 
-Lemma pseudoMetric_normal (A B : set X) : 
-  closed A -> closed B -> A `&` B = set0 -> exists (U V : set X), 
+Lemma pseudoMetric_normal (A B : set X) :
+  closed A -> closed B -> A `&` B = set0 -> exists (U V : set X),
     [/\ open U, open V, A `<=` U, B `<=` V & U `&` V = set0].
 Proof.
 move=> clA clB AB0; 
-have epsA' : forall x, exists (eps : {posnum R}), A x -> 
-    ball x eps%:num `&` B = set0.
-  move=> x; case: (pselect (A x)); last by move => ?; exists 1%:pos.
-  move=> Ax; have /regularP/(_ B clB) [] := @uniform_regular X x.
-    by move/disjoints_subset : AB0; apply.
+have eps' D : closed D -> forall (x:X), exists (eps : {posnum R}), ~ D x ->
+    ball x eps%:num `&` D = set0.
+  move=> clD x; case: (pselect (~ D x)); last by move => ?; exists 1%:pos.
+  move=> ndx; have /regularP/(_ _ clD) [//|] := @uniform_regular X x.
   move=> U [V] [+ oV] Ux /subsetC BV /disjoints_subset UV0.
   rewrite openE /interior => /(_ _ Ux); rewrite -nbhs_ballE; case.
   move => _/posnumP[eps] beU; exists eps => _; apply/disjoints_subset.
   by apply: (subset_trans beU); apply: (subset_trans UV0).
-pose epsA x := projT1 (cid (epsA' x)).
-have epsB' : forall x, exists (eps : {posnum R}), B x -> 
-    ball x eps%:num `&` A = set0.
-  move=> x; case: (pselect (B x)); last by move => ?; exists 1%:pos.
-  move=> Bx; have /regularP/(_ A clA) [] := @uniform_regular X x.
-    by move: AB0; rewrite setIC => /disjoints_subset; apply.
-  move=> U [V] [+ oV] Ux /subsetC BV /disjoints_subset UV0.
-  rewrite openE /interior => /(_ _ Ux); rewrite -nbhs_ballE; case.
-  move => _/posnumP[eps] beU; exists eps => _; apply/disjoints_subset.
-  by apply: (subset_trans beU); apply: (subset_trans UV0).
-pose epsB x := projT1 (cid (epsB' x)).
+pose epsA x := projT1 (cid (eps' _ clB x)).
+pose epsB x := projT1 (cid (eps' _ clA x)).
 exists (\bigcup_(x in A) interior (ball x ((epsA x)%:num/2)%:pos%:num)).
 exists (\bigcup_(x in B) interior (ball x ((epsB x)%:num/2)%:pos%:num)). 
 split.
@@ -1683,14 +1673,17 @@ split.
 - move=> x ?; exists x => //; apply: nbhsx_ballx.
 - move=> y ?; exists y => //; apply: nbhsx_ballx.
 - apply:contrapT=> /eqP/set0P; case => z [[x Ax /interior_subset Axe]].
-  case=> y By /interior_subset Bye; case: (pselect ((epsA x)%:num/2 <= (epsB y)%:num/2)).
-    move/ball_sym:Axe =>/[swap] /le_ball /[apply] /(ball_triangle Bye). 
-    rewrite -splitr; have/disjoints_subset := projT2 (cid (epsB' y)) By.
-    by move=> /[apply].
-  move/negP; rewrite leNgt negbK => /ltW. 
-  move/ball_sym:Bye =>/[swap] /le_ball /[apply] /(ball_triangle Axe). 
-  rewrite -splitr; have/disjoints_subset := projT2 (cid (epsA' x)) Ax.
-  by move=> /[apply].
+case=> y By /interior_subset Bye; have nAy : ~ A y.
+  by move: AB0; rewrite setIC => /disjoints_subset; apply.
+have nBx : ~ B x by move/disjoints_subset: AB0; apply.
+case: (pselect ((epsA x)%:num/2 <= (epsB y)%:num/2)).
+  move/ball_sym:Axe =>/[swap] /le_ball /[apply] /(ball_triangle Bye). 
+  rewrite -splitr => byx; have := projT2 (cid (eps' _ clA y)) nAy.
+  by rewrite -subset0; apply; split; first exact: byx.
+move/negP; rewrite leNgt negbK => /ltW. 
+move/ball_sym:Bye =>/[swap] /le_ball /[apply] /(ball_triangle Axe). 
+rewrite -splitr => byx; have := projT2 (cid (eps' _ clB x)) nBx.
+by rewrite -subset0; apply; split; first exact: byx.
 Qed.
   
 End pseudometric_normal.
