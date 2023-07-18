@@ -1595,6 +1595,106 @@ Proof. by rewrite -normr_eq0 -unitfE => /normrZV->. Qed.
 
 End NormedModule_numFieldType.
 
+Section uniform_regularity.
+
+Local Notation "A ^-1" := ([set xy | A (xy.2, xy.1)]) : classical_set_scope.
+
+Local Notation "'to_set' A x" := ([set y | A (x, y)])
+  (at level 0, A at level 0) : classical_set_scope.
+
+Definition regular (T : topologicalType) (x : T) := 
+  nbhs x `<=` filter_from (nbhs x) closure.
+
+Lemma ent_closure {X : uniformType} (x : X) E : entourage E ->
+  closure (to_set (split_ent E) x) `<=` to_set E x.
+Proof.
+pose E' := ((split_ent E) `&` ((split_ent E)^-1)%classic).
+move=> entE z /(_ [set y | E' (z, y)]) [].
+  by rewrite -nbhs_entourageE; exists E' => //; apply: filterI.
+by move=> y [/=] + [_]; apply: entourage_split.
+Qed.
+
+Lemma uniform_regular {X : uniformType} (x : X) : @regular X x.
+Proof.
+move=> A /=.
+rewrite -nbhs_entourageE; case => E entE /(subset_trans (ent_closure entE)) ?.
+by exists (to_set (split_ent E) x); first by exists (split_ent E).
+Qed.
+
+Lemma regularP {T : topologicalType} (x : T) : 
+  @regular T x <-> (forall A, closed A -> ~ A x -> exists (U V : set T),
+    [/\ open U, open V, U x, A `<=` V & U `&` V = set0]).
+Proof.
+split.
+  move=> + A clA nAx => /(_ (~` A)) [].
+    by apply: open_nbhs_nbhs; split => //; apply: closed_openC.
+  move=> U Ux /subsetC; rewrite setCK => AclU; exists (interior U). 
+  exists (~` (closure U)); split => //.
+  - by apply: open_interior.
+  - by apply: closed_openC; exact: closed_closure.
+  - apply/disjoints_subset; rewrite setCK; apply: (@subset_trans _ U).
+      exact: interior_subset.
+    exact: subset_closure.
+move=> + A Ax => /(_ (~` (interior A))) []; [|exact|].
+  by apply: open_closedC; exact: open_interior.
+move=> U [V] [oU oV Ux /subsetC cAV /disjoints_subset UV]; exists U.
+  by apply: open_nbhs_nbhs; split.
+apply: subset_trans; first exact: (closure_subset UV).
+move/open_closedC/closure_id:oV => <-.
+apply: (subset_trans cAV); rewrite setCK; exact: interior_subset.
+Qed.
+
+End uniform_regularity.
+
+Section pseudometric_normal.
+
+Context {R : realType} {X : pseudoMetricType R}.
+
+Lemma pseudoMetric_normal (A B : set X) : 
+  closed A -> closed B -> A `&` B = set0 -> exists (U V : set X), 
+    [/\ open U, open V, A `<=` U, B `<=` V & U `&` V = set0].
+Proof.
+move=> clA clB AB0; 
+have epsA' : forall x, exists (eps : {posnum R}), A x -> 
+    ball x eps%:num `&` B = set0.
+  move=> x; case: (pselect (A x)); last by move => ?; exists 1%:pos.
+  move=> Ax; have /regularP/(_ B clB) [] := @uniform_regular X x.
+    by move/disjoints_subset : AB0; apply.
+  move=> U [V] [+ oV] Ux /subsetC BV /disjoints_subset UV0.
+  rewrite openE /interior => /(_ _ Ux); rewrite -nbhs_ballE; case.
+  move => _/posnumP[eps] beU; exists eps => _; apply/disjoints_subset.
+  by apply: (subset_trans beU); apply: (subset_trans UV0).
+pose epsA x := projT1 (cid (epsA' x)).
+have epsB' : forall x, exists (eps : {posnum R}), B x -> 
+    ball x eps%:num `&` A = set0.
+  move=> x; case: (pselect (B x)); last by move => ?; exists 1%:pos.
+  move=> Bx; have /regularP/(_ A clA) [] := @uniform_regular X x.
+    by move: AB0; rewrite setIC => /disjoints_subset; apply.
+  move=> U [V] [+ oV] Ux /subsetC BV /disjoints_subset UV0.
+  rewrite openE /interior => /(_ _ Ux); rewrite -nbhs_ballE; case.
+  move => _/posnumP[eps] beU; exists eps => _; apply/disjoints_subset.
+  by apply: (subset_trans beU); apply: (subset_trans UV0).
+pose epsB x := projT1 (cid (epsB' x)).
+exists (\bigcup_(x in A) interior (ball x ((epsA x)%:num/2)%:pos%:num)).
+exists (\bigcup_(x in B) interior (ball x ((epsB x)%:num/2)%:pos%:num)). 
+split.
+- by apply: bigcup_open => ? ?; exact: open_interior.
+- by apply: bigcup_open => ? ?; exact: open_interior.
+- move=> x ?; exists x => //; apply: nbhsx_ballx.
+- move=> y ?; exists y => //; apply: nbhsx_ballx.
+- apply:contrapT=> /eqP/set0P; case => z [[x Ax /interior_subset Axe]].
+  case=> y By /interior_subset Bye; case: (pselect ((epsA x)%:num/2 <= (epsB y)%:num/2)).
+    move/ball_sym:Axe =>/[swap] /le_ball /[apply] /(ball_triangle Bye). 
+    rewrite -splitr; have/disjoints_subset := projT2 (cid (epsB' y)) By.
+    by move=> /[apply].
+  move/negP; rewrite leNgt negbK => /ltW. 
+  move/ball_sym:Bye =>/[swap] /le_ball /[apply] /(ball_triangle Axe). 
+  rewrite -splitr; have/disjoints_subset := projT2 (cid (epsA' x)) Ax.
+  by move=> /[apply].
+Qed.
+  
+End pseudometric_normal.
+
 Section PseudoNormedZmod_numDomainType.
 Variables (R : numDomainType) (V : pseudoMetricNormedZmodType R).
 
