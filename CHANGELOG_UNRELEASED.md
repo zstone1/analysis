@@ -80,12 +80,15 @@
   + lemmas `lte_pmulr`, `lte_pmull`, `lte_nmulr`, `lte_nmull`
   + lemmas `lte0n`, `lee0n`, `lte1n`, `lee1n`
 
+- in file `normedtype.v`,
+  + new lemmas `maxr_absE`, `minr_absE`, `continuous_min`, 
+    `continuous_max`, `urysohn_seperation`, `normal_separatorsP`, and 
+    `subset_closure_half`.
+
 - in file `topology.v`,
   + new definition `normal_space`.
-  + new lemma `filter_inv`.
+  + new lemmas `filter_inv`, and `countable_uniform_bounded`.
 
-- in file `normedtype.v`,
-  + lemmas `normal_separatorsP`, `urysohn_seperation`
 
 ### Changed
 
