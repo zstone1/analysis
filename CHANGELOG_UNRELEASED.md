@@ -22,9 +22,6 @@
   + new definition `set_nbhs`.
   + new lemmas `filterI_iter_sub`, `filterI_iterE`, `finI_fromI`, 
     `filterI_iter_finI`, `smallest_filter_finI`, and `set_nbhsP`.
-- in file `topology.v`,
-  + new definition `normal`.
-  + new lemma `filter_inv`.
 
 - in file `lebesgue_measure.v`,
   + new lemmas `pointwise_almost_uniform`, and 
@@ -82,6 +79,13 @@
 - in `constructive_ereal.v`:
   + lemmas `lte_pmulr`, `lte_pmull`, `lte_nmulr`, `lte_nmull`
   + lemmas `lte0n`, `lee0n`, `lte1n`, `lee1n`
+
+- in file `topology.v`,
+  + new definition `normal_space`.
+  + new lemma `filter_inv`.
+
+- in file `normedtype.v`,
+  + lemmas `normal_separatorsP`, `urysohn_seperation`
 
 ### Changed
 
