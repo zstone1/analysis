@@ -600,3 +600,25 @@ by exists f; rewrite -cstf; exact: cst_continuous.
 Qed.
 
 End alexandroff_hausdorff.
+
+Section cantor_ord.
+
+Definition cantor_swap (b : cantor_space) (x : cantor_space) : cantor_space := 
+  fun n => if b n then ~~ x n else x n.
+
+Lemma cantor_swapK b : cancel (cantor_swap b) (cantor_swap b).
+Proof.
+  move=> x; apply: funext => n. 
+  by rewrite /cantor_swap [~~ _]fun_if negbK; case: (b n).
+Qed.
+
+Lemma cantor_swap_idL b : cantor_swap b b = (fun=> false).
+Proof. by apply: funext => n; rewrite /cantor_swap; case: (b n). Qed.
+
+Lemma cantor_swap_idR b : cantor_swap b (fun=> false) = b.
+Proof. by apply: funext => n; rewrite /cantor_swap; case: (b n). Qed.
+
+(cantor_swap b) \o (cantor_swap c) (fun=> false)
+
+
+Lemma cantor
