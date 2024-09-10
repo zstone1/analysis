@@ -98,8 +98,36 @@ Qed.
 (* 3. Then each branch has a corresponding Cauchy filter.                     *)
 (* 4. The overall function from branches to X is a continuous surjection.     *)
 (* 5. With an extra disjointness condition, this is also an injection         *)
+(* 6. With an extra orderedness condition, this is also monotonic             *)
 (*                                                                            *)
 (******************************************************************************)
+
+Section tree_orders.
+
+Context {K : nat -> topologicalType} .
+
+Definition first_diff (t1 t2: prod_topology K) : option nat :=
+  xget None (Some  @` [set n | (forall m, m < n -> t1 m == t2 m) /\ t1 n != t2 n]).
+
+Definition lexi_bigprod  (R : forall n, K n -> K n -> bool) (t1 t2 : prod_topology K) :=
+  match first_diff t1 t2 with  
+  | Some n => R n (t1 n) (t2 n)
+  | None => true
+  end.
+
+Definition lift_rel {X : Type} (R : X -> X -> bool) (U V : set X) := 
+  forall x y, U x -> V y -> R x y.
+
+Definition preserve_order {X : Type}
+  (f : forall n, set X -> K n -> set X)
+  (g : prod_topology K -> X)
+  (RT : forall n, K n -> K n -> bool) 
+  (RX : X -> X -> bool) :=
+  (forall n U k1 k2 , RT n k1 k2 -> lift_rel RX (f n U k1) (f n U k2)) ->
+  (forall t1 t2, lexi_bigprod RT t1 t2 -> RX (g t1) (g t2)).
+End tree_orders.
+
+
 Section topological_trees.
 Context {K : nat -> topologicalType} {X : topologicalType}
         (refine_apx : forall n, set X -> K n -> set X)
@@ -236,16 +264,46 @@ rewrite (@triv m (branch_apx x m) (x m) (y m) I I) 1?brE//.
 by rewrite -[in X in X `&` _]brE; exact: tree_map_setI.
 Qed.
 
+Local Lemma tree_map_mono RT RX : reflexive RX ->
+  @preserve_order K X refine_apx tree_map RT RX.
+Proof.
+move=> RXrefl refine_ord t1 t2. 
+rewrite /lexi_bigprod/first_diff.
+case: xgetP => /=; first last.
+  move=> fnE; suff -> : t1 = t2 by rewrite RXrefl.
+  apply: functional_extensionality_dep.
+  suff : forall n, forall x, x < n -> t1 x = t2 x.
+    by move=> + n => /(_ n.+1)/(_ n); apply.
+  elim; first by move=> ?.
+  move=> n IH x; rewrite leq_eqVlt => /orP [/eqP/succn_inj ->|].
+    have /forall2NP/(_ n) [] := fnE (Some n) => // /not_andP.
+    case; last by move /negP; rewrite negbK => /eqP. 
+    by case/existsNP => m /not_implyP [//] mx; apply: absurd; apply/eqP/IH.
+  by move=> xn; apply: IH.
+case => //; last by move=> + [//].
+move=> n _ [? [+ +]] /Some_inj En; rewrite {}En => nmin _ t1Rt2.
+apply: (@refine_ord n (branch_apx t1 n) (t1 n) (t2 n)) => //.
+  exact: @tree_map_apx t1 n.+1.
+suff -> : branch_apx t1 n = branch_apx t2 n.
+  exact: @tree_map_apx t2 n.+1.
+move: nmin {t1Rt2}; elim: n => // n IH mn1 /=.
+rewrite IH; last by move => m /ltnW/mn1.
+by congr (_ _ _); apply/eqP; apply: mn1.
+Qed.
+
+Locate reflexive.
 Lemma tree_map_props : exists f : T -> X,
   [/\ continuous f,
       set_surj [set: T] [set: X] f &
-      (forall n U, trivIset [set: K n] (@refine_apx n U)) ->
-        set_inj [set: T] f].
+      ((forall n U, trivIset [set: K n] (@refine_apx n U)) -> set_inj [set: T] f) /\
+       (forall RT RX,
+       reflexive RX ->
+       @preserve_order K X refine_apx tree_map RT RX) ].
 Proof.
 exists tree_map; split.
 - exact: tree_map_cts.
 - exact: tree_map_surj.
-- exact: tree_map_inj.
+- split;[exact: tree_map_inj|exact: tree_map_mono].
 Qed.
 
 End topological_trees.
@@ -321,7 +379,7 @@ have [] := @tree_map_props
   rewrite {1 2}/c_ind; case: pselect => /=; rewrite ?UnA.
     by move=> _; case: e; case => // ? ?; apply/not_andP; left.
   by apply: absurd; split; [exists x | exists y].
-- move=> f [ctsf surjf injf]; exists f; split => //.
+- move=> f [ctsf surjf [injf ?]]; exists f; split => //.
   apply: injf.
   by move=> n U i j _ _ [z] [] [] + Uz [+ _]; move: i j => [] [].
 Qed.
