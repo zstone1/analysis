@@ -390,9 +390,9 @@ by apply: absurd; split; [exists x | exists y].
 Qed.
 
 Local Lemma cantor_map : exists f : cantor_space -> T,
-  [/\ continuous f ,
-      set_bij [set: cantor_space] [set: T] f &
-      False].
+  [/\ continuous f &
+      set_bij [set: cantor_space] [set: T] f
+  ].
 Proof.
 have [] := @tree_map_props
     (fun=> discrete_topology discrete_bool) T c_ind c_invar cmptT hsdfT.
@@ -406,10 +406,6 @@ have [] := @tree_map_props
 move=> f [ctsf surjf injf ordf]; exists f; split => //.
 split => //; apply: injf.
   by move=> n U i j _ _ [z] [] [] + Uz [+ _]; move: i j => [] [].
-move: ordf.
-simpl.
-rewrite /preserve_order /=.
-move /(_ (fun=> implb)).
 Qed.
 
 

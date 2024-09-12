@@ -4050,20 +4050,18 @@ Qed.
 
 End totally_disconnected.
 
-Local Open Scope order_scope.
-Local Open Scope classical_set_scope.
 Definition is_ray_or_open {d} {T : orderType d} (i : interval T) : Prop := 
   match i with
   | Interval (BRight _) (BLeft _) => True
-  | Interval (-oo) (BLeft _) => True
-  | Interval (BRight _) (+oo) => True
-  | Interval (-oo) (+oo) => True
+  | Interval (-oo)%O (BLeft _) => True
+  | Interval (BRight _) (+oo)%O => True
+  | Interval (-oo)%O (+oo)%O => True
   | _ => False
   end.
 
 HB.mixin Record Order_isTopological d (T : Type) of Topological T & Order.Total d T := {
-  rray_open : forall (x:T), open `]x,+oo[;
-  lray_open : forall (x:T), open `]-oo,x[;
+  rray_open : forall (x:T), open `]x,+oo[%classic;
+  lray_open : forall (x:T), open `]-oo,x[%classic;
   itv_filter : forall (x:T), nbhs x = filter_from 
     (fun i => is_ray_or_open i /\ x \in i)
     (fun i => [set` i])
@@ -4076,6 +4074,8 @@ HB.structure Definition OrderTopologicalType d :=
 From mathcomp Require Import set_interval.
 Section order_topologies.
 
+Local Open Scope order_scope.
+Local Open Scope classical_set_scope.
 Context {d} {T : orderTopologicalType d}.
 
 Lemma itv_open (x y : T) : open `]x, y[.
@@ -4190,13 +4190,8 @@ split; first split.
     by apply: (le_trans pr); rewrite /Order.le /=.
   by apply: (le_trans _ yq); rewrite /Order.le /=.
 Qed.
-  
-  
 
 End order_topologies.
-
-
-(*
 (** Uniform spaces *)
 
 Definition nbhs_ {T T'} (ent : set_system (T * T')) (x : T) :=
@@ -4226,6 +4221,10 @@ HB.structure Definition Uniform :=
 #[short(type="puniformType")]
 HB.structure Definition PointedUniform :=
   {T of PointedTopological T & Nbhs_isUniform_mixin T}.
+
+#[short(type="orderUniformType")]
+HB.structure Definition OrderUniform :=
+  {T of Uniform T & Order.Total T}.
 
 HB.factory Record Nbhs_isUniform M of Nbhs M := {
   entourage : set_system (M * M);
@@ -4930,6 +4929,10 @@ HB.structure Definition PseudoMetric (R : numDomainType) :=
 #[short(type="pseudoPMetricType")]
 HB.structure Definition PseudoPointedMetric (R : numDomainType) :=
   {T of Pointed T & Uniform T & Uniform_isPseudoMetric R T}.
+
+#[short(type="orderPseudoMetricType")]
+HB.structure Definition OrderPseudoMetric (R : numDomainType) :=
+  {T of PseudoMetric R T & Order.Total T}.
 
 Definition discrete_topology T (dsc : discrete_space T) : Type := T.
 
@@ -6959,4 +6962,3 @@ Qed.
 Local Close Scope relation_scope.
 
 #[global] Hint Resolve uniform_regular : core.
-*)
