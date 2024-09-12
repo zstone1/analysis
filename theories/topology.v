@@ -4050,6 +4050,153 @@ Qed.
 
 End totally_disconnected.
 
+Local Open Scope order_scope.
+Local Open Scope classical_set_scope.
+Definition is_ray_or_open {d} {T : orderType d} (i : interval T) : Prop := 
+  match i with
+  | Interval (BRight _) (BLeft _) => True
+  | Interval (-oo) (BLeft _) => True
+  | Interval (BRight _) (+oo) => True
+  | Interval (-oo) (+oo) => True
+  | _ => False
+  end.
+
+HB.mixin Record Order_isTopological d (T : Type) of Topological T & Order.Total d T := {
+  rray_open : forall (x:T), open `]x,+oo[;
+  lray_open : forall (x:T), open `]-oo,x[;
+  itv_filter : forall (x:T), nbhs x = filter_from 
+    (fun i => is_ray_or_open i /\ x \in i)
+    (fun i => [set` i])
+}.
+
+#[short(type="orderTopologicalType")]
+HB.structure Definition OrderTopologicalType d := 
+  { T of Topological T & Order.Total d T & Order_isTopological d T } .
+
+From mathcomp Require Import set_interval.
+Section order_topologies.
+
+Context {d} {T : orderTopologicalType d}.
+
+Lemma itv_open (x y : T) : open `]x, y[.
+Proof.
+by rewrite set_itv_splitI /=; apply: openI; [exact: rray_open|exact: lray_open].
+Qed.
+
+Lemma is_ray_or_open_open (i : interval T) : is_ray_or_open i -> open [set` i].
+Proof.
+case: i; rewrite /is_ray_or_open => [[[]t1|[]]] [[]t2|[]] ? => //.
+- exact: itv_open. 
+- exact: rray_open. 
+- exact: lray_open. 
+- by rewrite set_itvE; exact: openT.
+Qed.
+
+Lemma rray_closed (x : T) : closed `[x,+oo[.
+Proof.
+by rewrite -setCitvl closedC; exact: lray_open.
+Qed.
+
+Lemma lray_closed (x : T) : closed `]-oo,x].
+Proof.
+by rewrite -setCitvr closedC; exact: rray_open.
+Qed.
+
+Lemma itv_closed (x y : T) : closed `[x, y].
+Proof.
+rewrite set_itv_splitI; apply: closedI; first exact: rray_closed.
+exact: lray_closed.
+Qed.
+
+Lemma itv_closure (x y : T) : closure `]x, y[ `<=` `[x,y].
+Proof.
+rewrite closureE => r; apply; split; first exact: itv_closed.
+by apply: subset_itvS => /=; rewrite bnd_simp.
+Qed.
+
+Lemma itv_setU (i j : interval T) : [set` i] `&` [set` j]!=set0 ->
+    [set` (i `|` j)%O] = [set` i] `|` [set` j].
+Proof.
+case=> p [ip jp]; have pij : p \in (i `|` j)%O.
+  apply: le_trans; first exact: ip; exact: leUl.
+move: ip jp pij; case: i; case: j => a b x y /=.
+move=> /andP [xp py] /andP [ap pb] pab.
+rewrite eqEsubset; split => /= r /=; first last.
+  case; first by move=> ra; apply: (le_trans ra); exact: leUl.
+  by move=> rb; apply: (le_trans rb); exact: leUr.
+rewrite (@itv_splitUeq _ T p (x `&` a)%O) => //.
+move/orP; case. 
+  move=> /andP [xar rp]; have /orP [] := le_total a x.
+    move=> ax; right; apply/andP; split.
+      by apply: le_trans xar; rewrite leEmeet meetC in ax; move/eqP: ax => ->.
+    by apply: (le_trans rp); apply: (le_trans _ pb); rewrite /Order.le /=.
+    move=> xa; left; apply/andP; split.
+      by apply: le_trans xar; rewrite leEmeet in xa; move/eqP: xa => ->.
+    by apply: (le_trans rp); apply: (le_trans _ py); rewrite /Order.le /=.
+move=> /orP; case; first by move/eqP=> ->; left; apply/andP; split.
+move=> /andP [pr ryb]; have /orP [] := le_total b y.
+  move=> bly; left; apply/andP; split.
+    by apply: le_trans pr; apply: (le_trans xp); rewrite /Order.le /=. 
+  by apply: (le_trans ryb); rewrite leEjoin joinC in bly; move/eqP: bly => ->.
+move=> yb; right; apply/andP; split.
+  by apply: (le_trans ap); apply: le_trans pr; rewrite /Order.le /=. 
+by apply: (le_trans ryb); rewrite leEjoin in yb; move/eqP: yb => ->.
+Qed.
+    
+Lemma zero_dimensional_ray (x y : T) : x < y -> zero_dimensional T -> 
+  exists U, [/\ clopen U, U y , ~ U x & forall l r, U r -> ~ U l -> l < r ].
+Proof.
+move=> xy zt; have xNy : y != x.
+  by move : xy; rewrite lt_def; case/andP.
+have [U [clU Uy nUx]] := zt y x xNy.
+pose I := \bigcup_(i in [set i : interval T | [set` i] `<=` U /\ open [set` i]  /\ y \in i]) [set` i].
+have oI : open I by apply: bigcup_open => ? [?[]].
+have Iy : I y. 
+  case: clU => + _;  rewrite openE => /(_ _ Uy).
+  rewrite /interior /= itv_filter /=; case => i [] iy ??.
+  exists i => //; split => //; split => //; exact: is_ray_or_open_open.
+have cIV : closure I `<=` U. 
+  rewrite closureE => z /(_ U); apply; split; first by case: clU.
+  by move=> ? [? [+ _]]; exact.
+have clI : closed I.
+  apply/closure_id; rewrite eqEsubset; split; first exact: subset_closure.
+  move=> z cIi; have Uz : U z by exact: cIV.
+  case: clU => + _;  rewrite openE => /(_ _ Uz).
+  rewrite /interior /= itv_filter /=; case => i [/is_ray_or_open_open oi iy] siU.
+  case/(_ [set` i]): cIi; first by move: oi; rewrite openE; apply => /=.
+  move=> /= w [[j [jU [oJ jy] jw]]] wi; exists (i `|` j)%O; first last.
+    by apply: le_trans; first exact: iy; exact: leUl.
+  split; first by rewrite itv_setU ?{1}subUset //; exists w; split.
+  split; first by rewrite itv_setU ?{1}subUset //; [exact: openU | exists w].
+  by apply: le_trans; first exact: jy; exact: leUr.
+pose V := I `|` `[y,+oo[;  exists V.
+split; first split.
+- suff -> : V = I `|` `]y,+oo[ by apply: openU => //; exact: rray_open.
+  rewrite eqEsubset; split => z; case; first by left.
+  + by rewrite -setU1itv //; case; [move=> -> ; left| right].
+  + by left.
+  + by rewrite /V -setU1itv //; right; right.
+- apply: closedU => //; apply: rray_closed.
+- by left.
+- case; first by move/subset_closure/cIV.
+  by rewrite set_itvE /= leNgt xy.
+- move=> l r Vr Vl; rewrite ltNge; apply/negP; move: Vl; apply: contra_not.
+  move=> rl; case: Vr; first last.
+    by rewrite set_itvE; move=> yr; right; rewrite set_itvE; apply: (le_trans yr).
+  have /orP [|ly] := le_total y l; first by move=> + _; right; rewrite set_itvE.
+  case=> i [iu [oi] /= yi ri]; left; exists i; first by split.
+  move: iu oi => _ _; case: i yi ri => p q /= /andP [py yq] /andP[pr rq].
+  apply/andP; split. 
+    by apply: (le_trans pr); rewrite /Order.le /=.
+  by apply: (le_trans _ yq); rewrite /Order.le /=.
+Qed.
+  
+  
+
+End order_topologies.
+
+
+(*
 (** Uniform spaces *)
 
 Definition nbhs_ {T T'} (ent : set_system (T * T')) (x : T) :=
@@ -6812,3 +6959,4 @@ Qed.
 Local Close Scope relation_scope.
 
 #[global] Hint Resolve uniform_regular : core.
+*)
