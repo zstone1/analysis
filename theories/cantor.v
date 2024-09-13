@@ -105,16 +105,30 @@ Qed.
 
 Section tree_orders.
 
-Context {K : nat -> topologicalType} .
+Context {K : nat -> eqType} .
 
-Definition first_diff (t1 t2: prod_topology K) : option nat :=
+Definition first_diff (t1 t2: forall n, K n) : option nat :=
   xget None (Some  @` [set n | (forall m, m < n -> t1 m == t2 m) /\ t1 n != t2 n]).
 
-Definition lexi_bigprod  (R : forall n, K n -> K n -> bool) (t1 t2 : prod_topology K) :=
+Lemma first_diffC t1 t2 : first_diff t1 t2 = first_diff t2 t1.
+Proof.
+rewrite /first_diff /=; congr (_ _ _); rewrite eqEsubset; split => z /=;
+  (case => w [wE ?] ?; exists w => //; split; last by rewrite eq_sym);
+  by move=> ? ?; rewrite eq_sym; apply: wE.
+Qed.
+
+Definition lexi_bigprod  (R : forall n, K n -> K n -> bool) (t1 t2 : forall n, K n) :=
   match first_diff t1 t2 with  
   | Some n => R n (t1 n) (t2 n)
   | None => true
   end.
+
+Lemma lexi_bigprod_reflexive R : reflexive (lexi_bigprod R).
+Proof.
+move=> x; rewrite /lexi_bigprod /=.
+rewrite /lexi_bigprod/first_diff.
+by case: xgetP => //=; case=> // n /= _ [m [/= _]] /eqP.
+Qed.
 
 Definition lift_rel {X : Type} (R : X -> X -> bool) (U V : set X) := 
   forall x y, U x -> V y -> R x y.
@@ -149,15 +163,16 @@ Hypothesis refine_separates: forall x y : X, x != y ->
   exists n, forall (U : set X) e,
     @refine_apx n U e x -> ~@refine_apx n U e y.
 
-Let refine_subset n U e : @refine_apx n U e `<=` U.
-Proof. by rewrite [X in _ `<=` X](refine_cover n); exact: bigcup_sup. Qed.
-
 Let T := prod_topology K.
 
 Local Fixpoint branch_apx (b : T) n :=
   if n is m.+1 then refine_apx (branch_apx b m) (b m) else [set: X].
 
+Let refine_subset n U e : @refine_apx n U e `<=` U.
+Proof. by rewrite [X in _ `<=` X](refine_cover n); exact: bigcup_sup. Qed.
+
 Let tree_mapF b := filter_from [set: nat] (branch_apx b).
+Definition tree_map (b : T) : X := lim (tree_mapF b).
 
 Let tree_map_invar b n : tree_invariant (branch_apx b n).
 Proof. by elim: n => // n ?; exact: refine_invar. Qed.
@@ -177,7 +192,6 @@ move=> i j _ _; exists (maxn i j)  => //; rewrite subsetI.
 by split; apply: tree_map_sub; [exact: leq_maxl | exact: leq_maxr].
 Qed.
 
-Let tree_map b := lim (tree_mapF b).
 
 Let cvg_tree_map b : cvg (tree_mapF b).
 Proof.
@@ -296,15 +310,15 @@ suff -> : t1 n = t2 n by exact: RTrefl.
 by apply/eqP; apply: mn1.
 Qed.
 
-Lemma tree_map_props : exists f : T -> X,
-  [/\ continuous f,
-      set_surj [set: T] [set: X] f ,
-      (forall n U, trivIset [set: K n] (@refine_apx n U)) -> set_inj [set: T] f &
+Lemma tree_map_props :
+  [/\ continuous tree_map,
+      set_surj [set: T] [set: X] tree_map ,
+      (forall n U, trivIset [set: K n] (@refine_apx n U)) -> set_inj [set: T] tree_map &
       forall RT RX, reflexive RX -> 
         (forall n, reflexive (RT n)) -> 
-        @preserve_order K X refine_apx f RT RX tree_invariant ].
+        @preserve_order K X refine_apx tree_map RT RX tree_invariant ].
 Proof.
-exists tree_map; split.
+split.
 - exact: tree_map_cts.
 - exact: tree_map_surj.
 - exact: tree_map_inj.
@@ -353,7 +367,7 @@ Let c_ind n (V : set T) (b : bool) :=
     then U_ n else split_clopen V in
   (if b then Wn else ~` Wn) `&` V.
 
-Lemma c_ind_cover n V : V = \bigcup_e  c_ind n V e.
+Local Lemma c_ind_cover n V : V = \bigcup_e  c_ind n V e.
 Proof.
 rewrite eqEsubset; split => [t Vt|t [? ? []]//].
 have [?|?] := pselect (U_ n `&` V !=set0 /\ ~` U_ n `&` V !=set0).
@@ -365,7 +379,7 @@ have [scVt|scVt] := pselect (split_clopen V t).
 by exists false => //; rewrite /c_ind; case: pselect.
 Qed.
 
-Lemma c_ind_c_invar n U e : c_invar U -> c_invar (c_ind n U e).
+Local Lemma c_ind_c_invar n U e : c_invar U -> c_invar (c_ind n U e).
 Proof.
 move=> [] clU Un0; rewrite /c_ind; case: pselect => /=.
   move=> [UU CUU]; case: e => //; split => //; apply: clopenI => //.
@@ -377,7 +391,7 @@ case: e; split => //; first exact: clopenI.
 by apply: clopenI => //; exact: clopenC.
 Qed.
 
-Lemma c_ind_disj x y : x != y -> exists n : nat,
+Local Lemma c_ind_disj x y : x != y -> exists n : nat,
   forall U e, c_ind n U e x -> ~ c_ind n U e y.
 Proof.
 move=> /dsctT [A [clA Ax Any]].
@@ -389,9 +403,11 @@ rewrite {1 2}/c_ind; case: pselect => /=; rewrite ?UnA.
 by apply: absurd; split; [exists x | exists y].
 Qed.
 
-Local Lemma cantor_map : exists f : cantor_space -> T,
-  [/\ continuous f &
-      set_bij [set: cantor_space] [set: T] f
+Definition cantor_map : cantor_space -> T := tree_map c_ind.
+
+Local Lemma cantor_map' :
+  [/\ continuous (cantor_map) &
+      set_bij [set: cantor_space] [set: T] cantor_map
   ].
 Proof.
 have [] := @tree_map_props
@@ -403,17 +419,14 @@ have [] := @tree_map_props
 - by split; [exact: clopenT | exists point].
 - by move=> ? [[]].
 - by exact: c_ind_disj.
-move=> f [ctsf surjf injf ordf]; exists f; split => //.
+move=> ctsf surjf injf ordf; split => //.
 split => //; apply: injf.
-  by move=> n U i j _ _ [z] [] [] + Uz [+ _]; move: i j => [] [].
+by move=> n U i j _ _ [z] [] [] + Uz [+ _]; move: i j => [] [].
 Qed.
 
-
-Let tree_map := projT1 (cid cantor_map).
-
-Let tree_map_bij : bijective tree_map.
+Let tree_map_bij : bijective cantor_map.
 Proof.
-by rewrite -setTT_bijective; have [? ?] := projT2 (cid cantor_map).
+by rewrite -setTT_bijective; have [? ?] := cantor_map'.
 Qed. 
 
 #[local] HB.instance Definition _ := @BijTT.Build _ _ _ tree_map_bij.
@@ -422,10 +435,148 @@ Lemma homeomorphism_cantor_like :
   exists f : {splitbij [set: cantor_space] >-> [set: T]},
     continuous f /\ (forall A, closed A -> closed (f @` A)).
 Proof.
-exists [the {splitbij _ >-> _} of tree_map] => /=.
-have [cts [surj inje]] := projT2 (cid cantor_map); split; first exact: cts.
+exists [the {splitbij _ >-> _} of cantor_map] => /=.
+have [cts [surj inje]] := cantor_map'; split; first exact: cts.
 move=> A clA; apply: (compact_closed hsdfT).
-apply: (@continuous_compact _ _ tree_map); first exact: continuous_subspaceT.
+apply: (@continuous_compact _ _ cantor_map); first exact: continuous_subspaceT.
+apply: (@subclosed_compact _ _ [set: cantor_space]) => //.
+exact: cantor_space_compact.
+Qed.
+
+End TreeStructure.
+
+Section TreeStructure.
+Context {R : realType} {d} {T : orderPseudoMetricType d R}.
+Hypothesis cantorT : cantor_like T.
+
+Let dsctT : zero_dimensional T.   Proof. by case: cantorT. Qed.
+Let pftT  : perfect_set [set: T]. Proof. by case: cantorT. Qed.
+Let cmptT : compact [set: T].     Proof. by case: cantorT. Qed.
+Let hsdfT : @hausdorff_space T.   Proof. by case: cantorT. Qed.
+
+Let c_invar (U : set T) := clopen U /\ U !=set0.
+
+Let U_ := unsquash (clopen_surj cmptT).
+
+Let split_clopen' (U : set T) : exists V,
+  open U -> U !=set0 -> [/\ 
+    clopen V, 
+    V `&` U !=set0 , 
+    ~`V `&` U !=set0 &
+    lift_rel (Order.le) V (~`V)
+  ].
+Proof.
+have [oU|?] := pselect (open U); last by exists point.
+have [Un0|?] := pselect (U !=set0); last by exists point.
+have [x [y] [Ux] Uy xny] := (iffLR perfect_set2) pftT U oU Un0.
+have /orP [] := le_total x y.
+  move /eqP: xny; rewrite le_eqVlt => xny /orP [/eqP //|].
+  case/(zero_dimensional_ray) => // V [ clV Vy nVx Vlr].
+  exists (~`V) => // ? ?; split => //.
+  - exact: clopenC.
+  - by exists x.
+  - by rewrite setCK; exists y.
+  - move=> p q Vp Vq.
+    by apply: ltW; apply: Vlr => //; move: Vq; rewrite setCK.
+move /eqP: xny; rewrite le_eqVlt => xny /orP [/eqP //|].
+  by move: xny => /[swap] ->.
+case/(zero_dimensional_ray) => // V [ clV Vy nVx Vlr].
+exists (~`V) => // ? ?; split => //.
+- exact: clopenC.
+- by exists y.
+- by rewrite setCK; exists x.
+- move=> p q Vp Vq.
+  by apply: ltW; apply: Vlr => //; move: Vq; rewrite setCK.
+Qed.
+
+Let split_clopen (U : set T) := projT1 (cid (split_clopen' U)).
+
+Let c_ind n (V : set T) (b : bool) :=
+  let Wn :=
+    if pselect ((U_ n) `&` V !=set0 /\ ~` (U_ n) `&` V !=set0)
+    then U_ n else split_clopen V in
+  (if b then Wn else ~` Wn) `&` V.
+
+Local Lemma c_ind_cover' n V : V = \bigcup_e  c_ind n V e.
+Proof.
+rewrite eqEsubset; split => [t Vt|t [? ? []]//].
+have [?|?] := pselect (U_ n `&` V !=set0 /\ ~` U_ n `&` V !=set0).
+  have [Unt|Unt] := pselect (U_ n t).
+    by exists true => //; rewrite /c_ind; case: pselect.
+  by exists false => //; rewrite /c_ind; case: pselect.
+have [scVt|scVt] := pselect (split_clopen V t).
+  by exists true => //; rewrite /c_ind; case: pselect.
+by exists false => //; rewrite /c_ind; case: pselect.
+Qed.
+
+Local Lemma c_ind_c_invar' n U e : c_invar U -> c_invar (c_ind n U e).
+Proof.
+move=> [] clU Un0; rewrite /c_ind; case: pselect => /=.
+  move=> [UU CUU]; case: e => //; split => //; apply: clopenI => //.
+    exact: funS.
+  by apply: clopenC => //; exact: funS.
+move=> _; have [|//|clscU scUU CscUU] := projT2 (cid (split_clopen' U)).
+  by case: clU.
+case: e; split => //; first exact: clopenI.
+by apply: clopenI => //; exact: clopenC.
+Qed.
+
+Local Lemma c_ind_disj' x y : x != y -> exists n : nat,
+  forall U e, c_ind n U e x -> ~ c_ind n U e y.
+Proof.
+move=> /dsctT [A [clA Ax Any]].
+have [n _ UnA] := @surj _ _ _ _ U_ _ clA; exists n => V e.
+have [|+ _] := pselect (V y); last by apply: subsetC => ? [].
+have [Vx Vy|? _ []//] := pselect (V x).
+rewrite {1 2}/c_ind; case: pselect => /=; rewrite ?UnA.
+  by move=> _; case: e; case => // ? ?; apply/not_andP; left.
+by apply: absurd; split; [exists x | exists y].
+Qed.
+
+Definition ord_cantor_map : cantor_space -> T := tree_map c_ind.
+
+Local Lemma ord_cantor_map' :
+  [/\ continuous (ord_cantor_map) ,
+      set_bij [set: cantor_space] [set: T] ord_cantor_map &
+      forall x y, lexi_bigprod (fun=> Order.le) x y -> 
+        (ord_cantor_map x <= ord_cantor_map y)%O
+  ].
+Proof.
+have [] := @tree_map_props
+    (fun=> discrete_topology discrete_bool) T c_ind c_invar cmptT hsdfT.
+- by move=> ?; exact: discrete_pointed.
+- exact: c_ind_cover'.
+- exact: c_ind_c_invar'.
+- by move=> ? [].
+- by split; [exact: clopenT | exists point].
+- by move=> ? [[]].
+- by exact: c_ind_disj'.
+move=> ctsf surjf injf ordf; split => //.
+  split => //; apply: injf.
+  by move=> n U i j _ _ [z] [] [] + Uz [+ _]; move: i j => [] [].
+move=> x y.
+apply: ordf => // [_ //|n U /= + + invarU]; case; case => //= _ _.
+move=> p q /=.
+rewrite /c_ind;case: pselect => //=.
+
+
+Qed.
+
+Let tree_map_bij : bijective cantor_map.
+Proof.
+by rewrite -setTT_bijective; have [? ?] := cantor_map'.
+Qed. 
+
+#[local] HB.instance Definition _ := @BijTT.Build _ _ _ tree_map_bij.
+
+Lemma homeomorphism_cantor_like :
+  exists f : {splitbij [set: cantor_space] >-> [set: T]},
+    continuous f /\ (forall A, closed A -> closed (f @` A)).
+Proof.
+exists [the {splitbij _ >-> _} of cantor_map] => /=.
+have [cts [surj inje]] := cantor_map'; split; first exact: cts.
+move=> A clA; apply: (compact_closed hsdfT).
+apply: (@continuous_compact _ _ cantor_map); first exact: continuous_subspaceT.
 apply: (@subclosed_compact _ _ [set: cantor_space]) => //.
 exact: cantor_space_compact.
 Qed.

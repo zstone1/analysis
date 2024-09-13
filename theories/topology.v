@@ -4067,8 +4067,14 @@ HB.mixin Record Order_isTopological d (T : Type) of Topological T & Order.Total 
     (fun i => [set` i])
 }.
 
+HB.structure Definition OrderPointed d := 
+{ T of Pointed T & Order.Total d T } .
+
+HB.structure Definition OrderNbhs d := 
+{ T of Nbhs T & Order.Total d T } .
+
 #[short(type="orderTopologicalType")]
-HB.structure Definition OrderTopologicalType d := 
+HB.structure Definition OrderTopological d := 
   { T of Topological T & Order.Total d T & Order_isTopological d T } .
 
 From mathcomp Require Import set_interval.
@@ -4223,8 +4229,8 @@ HB.structure Definition PointedUniform :=
   {T of PointedTopological T & Nbhs_isUniform_mixin T}.
 
 #[short(type="orderUniformType")]
-HB.structure Definition OrderUniform :=
-  {T of Uniform T & Order.Total T}.
+HB.structure Definition OrderUniform d :=
+  {T of Uniform T & OrderTopological d  T}.
 
 HB.factory Record Nbhs_isUniform M of Nbhs M := {
   entourage : set_system (M * M);
@@ -4931,8 +4937,8 @@ HB.structure Definition PseudoPointedMetric (R : numDomainType) :=
   {T of Pointed T & Uniform T & Uniform_isPseudoMetric R T}.
 
 #[short(type="orderPseudoMetricType")]
-HB.structure Definition OrderPseudoMetric (R : numDomainType) :=
-  {T of PseudoMetric R T & Order.Total T}.
+HB.structure Definition OrderPseudoMetric d (R : numDomainType) :=
+  {T of PseudoMetric R T & OrderTopological d T}.
 
 Definition discrete_topology T (dsc : discrete_space T) : Type := T.
 
