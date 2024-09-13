@@ -3951,13 +3951,23 @@ Qed.
 HB.instance Definition _ := Nbhs_isNbhsTopological.Build bool
   principal_filter_proper discrete_sing discrete_nbhs.
 
-Lemma discrete_bool : discrete_space [the topologicalType of bool : Type].
+End DiscreteTopology.
+
+Lemma discrete_bool : discrete_space bool.
 Proof. by []. Qed.
 
 Lemma bool_compact : compact [set: bool].
 Proof. by rewrite setT_bool; apply/compactU; exact: compact_set1. Qed.
 
-End DiscreteTopology.
+Lemma discrete_nat : discrete_space nat.
+Proof.  
+rewrite /discrete_space funeq2E => n U; rewrite propeqE.
+split.
+   by case => /= V [_ Vn VU]; apply/principal_filterP; apply: VU.
+move/principal_filterP => Un; exists U; split => //=; exists U => //.
+rewrite eqEsubset; split => z /=; first by case => ? ? ->.
+by move=> ?; exists z.
+Qed.
 
 #[global] Hint Resolve discrete_bool : core.
 
@@ -4145,7 +4155,7 @@ move=> yb; right; apply/andP; split.
   by apply: (le_trans ap); apply: le_trans pr; rewrite /Order.le /=. 
 by apply: (le_trans ryb); rewrite leEjoin in yb; move/eqP: yb => ->.
 Qed.
-    
+
 Lemma zero_dimensional_ray (x y : T) : x < y -> zero_dimensional T -> 
   exists U, [/\ clopen U, U y , ~ U x & forall l r, U r -> ~ U l -> l < r ].
 Proof.
@@ -4195,6 +4205,99 @@ split; first split.
 Qed.
 
 End order_topologies.
+
+Section bool_ord_topology.
+Local Open Scope classical_set_scope.
+Local Open Scope order_scope.
+Local Lemma bool_lray (b : bool) : open (`]-oo,b[%classic).
+Proof. exact: discrete_open. Qed.
+    
+Local Lemma bool_rray (b : bool) : open (`]b,+oo[%classic).
+Proof. exact: discrete_open. Qed.
+
+Local Lemma bool_nbhs_itv (b : bool) : 
+  nbhs b = filter_from 
+    (fun i => is_ray_or_open i /\ b \in i)
+    (fun i => [set` i]).
+Proof. 
+rewrite discrete_bool eqEsubset.
+split=> U.
+  move/principal_filterP; case: b.
+    move=> Ut; exists `]false, +oo[; first split => //.
+    by move=> r /=; rewrite in_itv /=; case: r.
+  move=> Ut; exists `]-oo, true[; first split => //.
+  by move=> r /=; rewrite in_itv /=; case: r.
+case => V [_ Vb] VU; apply/principal_filterP/VU; apply: Vb.
+Qed.
+
+HB.instance Definition _ := Order_isTopological.Build _ bool
+  bool_rray bool_lray bool_nbhs_itv.
+End bool_ord_topology.
+
+Section nat_ord_topology.
+Local Open Scope classical_set_scope.
+Local Open Scope order_scope.
+Local Lemma nat_lray (n : nat) : open (`]-oo,n[%classic).
+Proof. by apply: discrete_open; exact: discrete_nat. Qed.
+
+Local Lemma nat_rray (n : nat) : open (`]n,+oo[%classic).
+Proof. by apply: discrete_open; exact: discrete_nat. Qed.
+
+Local Lemma nat_nbhs_itv (n : nat) : 
+  nbhs n = filter_from 
+    (fun i => is_ray_or_open i /\ n \in i)
+    (fun i => [set` i]).
+Proof. 
+rewrite discrete_nat eqEsubset; split=> U.
+  move/principal_filterP; case: n.
+    move=> U0; exists `]-oo, 1[; first split => //.
+    by move=> r /=; rewrite in_itv /=; case: r.
+  move=> n USn; exists `]n, n.+2[; first split => //.
+    by rewrite in_itv; apply/andP;split => //=; rewrite /Order.lt //=.
+  move=> r /=; rewrite in_itv /= => nr2; suff: r = n.+1 by move=>->.
+  by apply/sym_equal; apply: le_anti. 
+case => V [_ Vb] VU; apply/principal_filterP/VU; apply: Vb.
+Qed.
+
+HB.instance Definition _ := Order_isTopological.Build _ nat
+  nat_rray nat_lray nat_nbhs_itv.
+
+End nat_ord_topology.
+
+Section sub_ord_topology.
+
+Context {d} {T : orderTopologicalType d} {U : subType T}.
+
+Notation U' := (weak_topology val).
+HB.instance Definition _ := Order.Total.copy U' (sub_type U).
+
+Local Lemma sub_lray (u : U') : open (`]-oo,u[%classic).
+Proof. 
+exists (`]-oo, \val u[%classic); first exact: lray_open.
+rewrite eqEsubset; split => z /=; rewrite ?in_itv /= ltEsub //.
+Qed.
+
+Local Lemma sub_rray (u : U') : open (`]u,+oo[%classic).
+Proof. 
+exists (`]\val u, +oo[%classic); first exact: rray_open.
+rewrite eqEsubset; split => z /=; rewrite ?in_itv /= ltEsub //.
+Qed.
+
+Local Lemma sub_nbhs_itv (u : U') : 
+  nbhs u = filter_from 
+    (fun i => is_ray_or_open i /\ u \in i)
+    (fun i => [set` i]).
+Proof. 
+rewrite eqEsubset; split => V.
+  case => /= ? [[/= V']] + <- /= V'u V'V .
+  rewrite openE /= => /(_ _ V'u); rewrite /interior/= itv_filter /=.
+  case; case=> l r [rayitvi vui iV']. 
+Qed.
+
+
+
+(*
+
 (** Uniform spaces *)
 
 Definition nbhs_ {T T'} (ent : set_system (T * T')) (x : T) :=
@@ -6965,3 +7068,4 @@ Qed.
 Local Close Scope relation_scope.
 
 #[global] Hint Resolve uniform_regular : core.
+*)
