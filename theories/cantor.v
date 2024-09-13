@@ -105,10 +105,10 @@ Qed.
 
 Section tree_orders.
 
-Context {K : nat -> eqType} .
+Context {d} {I : orderType d} {K : I -> eqType} .
 
-Definition first_diff (t1 t2: forall n, K n) : option nat :=
-  xget None (Some  @` [set n | (forall m, m < n -> t1 m == t2 m) /\ t1 n != t2 n]).
+Definition first_diff (t1 t2: forall n, K n) : option I :=
+  xget None (Some  @` [set n | (forall m, (m < n)%O -> t1 m == t2 m) /\ t1 n != t2 n]).
 
 Lemma first_diffC t1 t2 : first_diff t1 t2 = first_diff t2 t1.
 Proof.
@@ -129,6 +129,16 @@ move=> x; rewrite /lexi_bigprod /=.
 rewrite /lexi_bigprod/first_diff.
 by case: xgetP => //=; case=> // n /= _ [m [/= _]] /eqP.
 Qed.
+
+Lemma first_diff_min (t1 t2 t3: forall n, K n) : 
+  first_diff t1 t3 = match (first_diff t1 t2, first_diff t2 t3) with 
+    | (None, x) => x
+    | (x, None) => x
+    | (Some i, Some j) => Some (i `&` j)%O
+    end.
+Proof.
+simpl.
+Lemma lexi_bigprod_trans
 
 Definition lift_rel {X : Type} (R : X -> X -> bool) (U V : set X) := 
   forall x y, U x -> V y -> R x y.
