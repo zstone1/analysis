@@ -3,7 +3,7 @@ From HB Require Import structures.
 From mathcomp Require Import all_ssreflect all_algebra finmap generic_quotient.
 From mathcomp Require Import archimedean.
 From mathcomp Require Import boolp classical_sets functions wochoice.
-From mathcomp Require Import cardinality mathcomp_extra fsbigop.
+From mathcomp Require Import cardinality mathcomp_extra fsbigop set_interval.
 Require Import reals signed.
 
 (**md**************************************************************************)
@@ -4060,89 +4060,12 @@ Qed.
 
 End totally_disconnected.
 
-Definition is_ray_itv {d} {T : porderType d} (i : interval T) : Prop := 
-  match i with
-  | Interval (-oo)%O (BLeft _) => True
-  | Interval (BRight _) (+oo)%O => True
-  | Interval (-oo)%O (+oo)%O => True
-  | _ => False
-  end.
-Definition is_open_itv {d} {T : porderType d} (i : interval T) : Prop := 
-  match i with
-  | Interval (BRight _) (BLeft _) => True
-  | _ => False
-  end.
-
-Definition is_ray_or_open {d} {T : porderType d} (i : interval T) : Prop := 
-  is_ray_itv i \/ is_open_itv i.
-
-Lemma is_ray_or_open_rside {d} {T : porderType d} l b (t : T) : 
-  is_ray_or_open (Interval l (BSide b t)) -> b = true.
-Proof. by case: b; move: l => [[]?|[]] // [] //. Qed.
-
-Lemma is_ray_or_open_rinfty {d} {T : porderType d} l b : 
-  is_ray_or_open (Interval l (BInfty T b)) -> b = false.
-Proof. by case: b => //; move: l => [[]?|[]] // []. Qed.
-
-Lemma is_ray_or_open_lside {d} {T : porderType d} l b (t : T) : 
-  is_ray_or_open (Interval (BSide b t) l) -> b = false.
-Proof. by case: b; move: l => [[]?|[]] // [] //. Qed.
-
-Lemma is_ray_or_open_linfty {d} {T : porderType d} l b : 
-  is_ray_or_open (Interval (BInfty T b) l) -> b = true.
-Proof. by case: b => //; move: l => [[]?|[]] // []. Qed.
-
-Lemma is_ray_or_openI {d} {T : orderType d} (i j : interval T) : 
-  is_ray_or_open i -> is_ray_or_open j -> is_ray_or_open (i `&` j)%O.
-Proof.
-case: i=> [][[]a|[]] [[]b|[]] [] //= _;
-  case: j => [][[]x|[]] [[]y|[]] []//= _;
-  (try now left); (try now right);
-  rewrite /Order.meet /= /Order.meet /= /Order.join /= -?ltNge;
-  rewrite -?andb_orl -?orb_andl ?lte_anti ?le_total //=;
-  (try now left); (try now right).
-Qed.
-
-Lemma itv_setU {d} {T : orderType d} (i j : interval T) : [set` i] `&` [set` j]!=set0 ->
-    [set` (i `|` j)%O] = [set` i] `|` [set` j].
-Proof.
-case=> p [ip jp]; have pij : p \in (i `|` j)%O.
-  apply: le_trans; first exact: ip; exact: leUl.
-move: ip jp pij; case: i; case: j => a b x y /=.
-move=> /andP [xp py] /andP [ap pb] pab.
-rewrite eqEsubset; split => /= r /=; first last.
-  case; first by move=> ra; apply: (le_trans ra); exact: leUl.
-  by move=> rb; apply: (le_trans rb); exact: leUr.
-rewrite (@itv_splitUeq _ T p (x `&` a)%O) => //.
-move/orP; case. 
-  move=> /andP [xar rp]; have /orP [] := le_total a x.
-    move=> ax; right; apply/andP; split.
-      by apply: le_trans xar; rewrite leEmeet meetC in ax; move/eqP: ax => ->.
-    by apply: (le_trans rp); apply: (le_trans _ pb); rewrite /Order.le /=.
-    move=> xa; left; apply/andP; split.
-      by apply: le_trans xar; rewrite leEmeet in xa; move/eqP: xa => ->.
-    by apply: (le_trans rp); apply: (le_trans _ py); rewrite /Order.le /=.
-move=> /orP; case; first by move/eqP=> ->; left; apply/andP; split.
-move=> /andP [pr ryb]; have /orP [] := le_total b y.
-  move=> bly; left; apply/andP; split.
-    by apply: le_trans pr; apply: (le_trans xp); rewrite /Order.le /=. 
-  by apply: (le_trans ryb); rewrite leEjoin joinC in bly; move/eqP: bly => ->.
-move=> yb; right; apply/andP; split.
-  by apply: (le_trans ap); apply: le_trans pr; rewrite /Order.le /=. 
-by apply: (le_trans ryb); rewrite leEjoin in yb; move/eqP: yb => ->.
-Qed.
-
-Lemma itv_setI {d} {T : orderType d} (i j : interval T) : [set` (i `&` j)%O] = [set` i] `&` [set` j].
-Proof.
-by rewrite eqEsubset; split => z; rewrite /in_mem/=/pred_of_itv/= lexI => /andP.
-Qed.
-
-(** TODO: generalize this to a partialPreOrder once that's available*)
-HB.mixin Record Order_isNbhs d (T : Type) of Nbhs T & Order.POrder d T := {
+(** TODO: generalize this to a preOrder once that's available*)
+HB.mixin Record Order_isNbhs d (T : Type) of Nbhs T & Order.Total d T := {
   (** Note that just the intervals `]a,b[ doesn't work when the order has a 
       top or bottom element, so we also need the rays `]-oo,b[ and ]a,+oo[*)
-  itv_filterE : forall (x:T), nbhs x = filter_from 
-    (fun i => is_ray_or_open i /\ x \in i)
+  itv_nbhsE : forall (x:T), nbhs x = filter_from 
+    (fun i => itv_open_ends i /\ x \in i)
     (fun i => [set` i])
 }.
 
@@ -4163,68 +4086,66 @@ Context {d} {T : orderTopologicalType d}.
 
 Lemma rray_open (x : T) : open `]x,+oo[.
 Proof.
-rewrite openE /interior => z xoz; rewrite itv_filterE.
+rewrite openE /interior => z xoz; rewrite itv_nbhsE.
 by exists (`]x, +oo[)%O => //; split => //; left.
 Qed.
+Hint Resolve rray_open : core.
 
 Lemma lray_open (x : T) : open `]-oo,x[.
 Proof.
-rewrite openE /interior => z xoz; rewrite itv_filterE.
+rewrite openE /interior => z xoz; rewrite itv_nbhsE.
 by exists (`]-oo, x[)%O => //; split => //; left.
 Qed.
+Hint Resolve lray_open : core.
 
 Lemma itv_open (x y : T) : open `]x, y[.
 Proof.
-by rewrite set_itv_splitI /=; apply: openI; [exact: rray_open|exact: lray_open].
+by rewrite set_itv_splitI /=; apply: openI.
 Qed.
+Hint Resolve itv_open : core.
 
-Lemma is_ray_or_open_open (i : interval T) : is_ray_or_open i -> open [set` i].
+Lemma itv_open_ends_open (i : interval T) : itv_open_ends i -> open [set` i].
 Proof.
-case: i; rewrite /is_ray_or_open => [[[]t1|[]]] [[]t2|[]] []? => //.
-- exact: itv_open. 
-- exact: rray_open. 
-- exact: lray_open. 
-- by rewrite set_itvE; exact: openT.
+case: i; rewrite /itv_open_ends => [[[]t1|[]]] [[]t2|[]] []? => //.
+by rewrite set_itvE; exact: openT.
 Qed.
 
 Lemma rray_closed (x : T) : closed `[x,+oo[.
-Proof.
-by rewrite -setCitvl closedC; exact: lray_open.
-Qed.
+Proof. by rewrite -setCitvl closedC. Qed.
+Hint Resolve rray_closed : core.
 
 Lemma lray_closed (x : T) : closed `]-oo,x].
-Proof.
-by rewrite -setCitvr closedC; exact: rray_open.
-Qed.
+Proof. by rewrite -setCitvr closedC. Qed.
+Hint Resolve lray_closed : core.
 
 Lemma itv_closed (x y : T) : closed `[x, y].
 Proof.
-rewrite set_itv_splitI; apply: closedI; first exact: rray_closed.
-exact: lray_closed.
+by rewrite set_itv_splitI; apply: closedI => /=. 
 Qed.
+Hint Resolve itv_closed : core.
 
 Lemma itv_closure (x y : T) : closure `]x, y[ `<=` `[x,y].
 Proof.
-rewrite closureE => r; apply; split; first exact: itv_closed.
+rewrite closureE => r; apply; split => //.
 by apply: subset_itvS => /=; rewrite bnd_simp.
 Qed.
 
 Lemma itv_closed_infimums (A : set T) : A !=set0 -> closed A -> infimums A `<=` A.
 Proof.
 move=> [a0 Aa0] + l [loL] hiL; rewrite closure_id => -> => U.
-rewrite itv_filterE; case; case => /= p q []. 
+rewrite itv_nbhsE; case; case => /= p q []. 
 case E: ([set` Interval (BSide true l) q] `&` A == set0); first last.
   case/eqP/eqP/set0P:E => a [lqa ?] ? lpq pqU; exists a; split => //.
   apply: pqU; move: lpq lqa; rewrite /= ?inE => lpq /le_trans; apply.
   by move: lpq => /andP [? ?]; apply/andP.
 case: q E.
-  move=> b q /[swap] /is_ray_or_open_rside -> E lpq ; suff : lbound A q. 
+  move=> b q /[swap] /itv_open_ends_rside -> E lpq ; suff : lbound A q. 
     move/hiL => + _; rewrite leNgt; apply: contraNP => _. 
     by move: lpq; rewrite in_itv => /andP [].
   move=> a Aa; have : (~`(`[l,q[ `&` A)) a by move/eqP: E => ->.
-  rewrite setCI; case; rewrite // setCitv /= ?in_itv //= ?Bool.andb_true_r //=. 
+  rewrite setCI; case; rewrite // setCitv /= ?in_itv //= ?andbT //=. 
   by case => //; rewrite ltNge; rewrite (loL _ Aa).
-move=> b _ /is_ray_or_open_rinfty -> lpo poU; exists a0; split => //.
+move=> b _ /itv_open_ends_rinfty -> lpo poU; exists a0; split => //.
 apply: poU; move: lpo; rewrite /= ?itv_boundlr /= => /andP [pl _]; apply/andP.
 by split => //; apply: (le_trans pl); apply: loL.
 Qed.
@@ -4232,98 +4153,109 @@ Qed.
 Lemma itv_closed_supremums (A : set T) : A !=set0 -> closed A -> supremums A `<=` A.
 Proof.
 move=> [a0 Aa0] + l [upL] lbL; rewrite closure_id => -> => U.
-rewrite itv_filterE; case; case => /= p q []. 
+rewrite itv_nbhsE; case; case => /= p q []. 
 case E: ([set` Interval p (BSide false l)] `&` A == set0); first last.
   case/eqP/eqP/set0P:E => a [lqa ?] ? lpq pqU; exists a; split => //.
   apply: pqU; move: lpq lqa; rewrite /= ?inE => lpq /le_trans; apply.
   by move: lpq => /andP [? ?]; apply/andP.
 case: p E.
-  move=> b p /[swap] /is_ray_or_open_lside -> E lpq ; suff : ubound A p. 
+  move=> b p /[swap] /itv_open_ends_lside -> E lpq ; suff : ubound A p. 
     move/lbL => + _; rewrite leNgt; apply: contraNP => _. 
     by move: lpq; rewrite in_itv => /andP [].
   move=> a Aa; have : (~`(`]p,l] `&` A)) a by move/eqP: E => ->.
-  rewrite setCI; case; rewrite // setCitv /= ?in_itv //= ?Bool.andb_true_r //=. 
+  rewrite setCI; case; rewrite // setCitv /= ?in_itv //= ?andbT //=. 
   by case => //; rewrite ltNge; rewrite (upL _ Aa).
-move=> b _ /is_ray_or_open_linfty -> lpo poU; exists a0; split => //.
+move=> b _ /itv_open_ends_linfty -> lpo poU; exists a0; split => //.
 apply: poU; move: lpo; rewrite /= ?itv_boundrl /= => /andP [_ pl]; apply/andP.
 by split => //; apply: (le_trans _ pl); apply: upL.
 Qed.
 
 Lemma order_hausdorff : hausdorff_space T.
 Proof.
-rewrite open_hausdorff=> p q. 
-wlog : p q / p < q.
+rewrite open_hausdorff=> p q; wlog : p q / p < q.
   have /orP [] := le_total p q; rewrite le_eqVlt => /orP [/eqP ->|].
   - by rewrite eqxx.
   - by move=> ?; apply.
   - by rewrite eqxx.
   - move=> qp WH; rewrite eq_sym => qNp; have := WH _ _ qp qNp.
-    case; case=> P Q => [[]] ? ? [] ? ? ?; exists (Q,P); split => //.
-    by rewrite setIC.
+    by case; case=> P Q [] ? ? [] ? ? ?; exists (Q,P); split; rewrite // setIC.
 move=> plq ?; case: (pselect (exists z, p < z < q)).
-  case=> z /andP [pz qz]; exists (`]-oo,z[, `]z,+oo[).
+  case=> z /andP [? ?]; exists (`]-oo,z[, `]z,+oo[).
     by split => //=; apply/mem_set; rewrite set_itvE.
-  split => //=;[exact: lray_open| exact: rray_open |].
-  apply/eqP; rewrite -subset0 => r; rewrite ?set_itvE; case => /= rz zr.
-  by (suff : r < z < r by rewrite lte_anti); rewrite rz zr.
+  split => //=; apply/eqP; rewrite -subset0 => r; rewrite ?set_itvE. 
+  by case => /= rz zr; (suff : r < z < r by rewrite lte_anti); rewrite rz zr.
 move=> npzq; exists (`]-oo,q[, `]p,+oo[); split => //=.
 - by apply /mem_set; rewrite set_itvE.
 - by apply /mem_set; rewrite set_itvE.
-- exact: lray_open.
-- exact: rray_open.
 apply/eqP; rewrite -subset0 => r; rewrite ?set_itvE; case => /= rz zr.
 by apply: npzq; exists r; rewrite rz zr.
 Qed.
-  
+
+Lemma clopen_bigcup_clopen (x : T) (U : set T) : clopen U -> U x -> 
+  clopen (\bigcup_(i in [set i : interval T | 
+    [set` i] `<=` U /\ open [set` i] /\ x \in i]) [set` i]).
+Proof.
+pose I := (\bigcup_(i in [set i : interval T | 
+    [set` i] `<=` U /\ open [set` i] /\ x \in i]) [set` i]).
+move=> clU Ux; split.
+  by apply: bigcup_open => ? [?[]].
+have cIV : closure I `<=` U.
+  rewrite closureE => z /(_ U); apply; split; first by case: clU.
+  by move=> ? [? [+ _]]; exact.
+apply/closure_id; rewrite eqEsubset; split; first exact: subset_closure.
+move=> z cIi; have Uz : U z by exact: cIV.
+case: clU => + _;  rewrite {1}openE => /(_ _ Uz).
+rewrite /interior /= itv_nbhsE /=; case => i [/itv_open_ends_open oi iy] siU.
+case/(_ [set` i]): cIi; first by move: oi; rewrite openE; apply => /=.
+move=> /= w [[j [jU [oJ jy] jw]]] wi; exists (i `|` j)%O; first last.
+  by apply: le_trans; first exact: iy; exact: leUl.
+split; first by rewrite itv_setU ?{1}subUset //; exists w; split.
+split; first by rewrite itv_setU ?{1}subUset //; [exact: openU | exists w].
+by apply: le_trans; first exact: jy; exact: leUr.
+Qed.
+
 Lemma zero_dimensional_ray (x y : T) : x < y -> zero_dimensional T -> 
   exists U, [/\ clopen U, U y , ~ U x & forall l r, U r -> ~ U l -> l < r ].
 Proof.
 move=> xy zt; have xNy : y != x.
   by move : xy; rewrite lt_def; case/andP.
 have [U [clU Uy nUx]] := zt y x xNy.
-pose I := \bigcup_(i in [set i : interval T | [set` i] `<=` U /\ open [set` i]  /\ y \in i]) [set` i].
-have oI : open I by apply: bigcup_open => ? [?[]].
-have Iy : I y. 
+pose open_subU_y (i : interval T) := [set` i] `<=` U /\ open [set` i]  /\ y \in i.
+pose I := \bigcup_(i in [set i | open_subU_y i]) [set` i].
+have Iy : I y.
   case: clU => + _;  rewrite openE => /(_ _ Uy).
-  rewrite /interior /= itv_filterE /=; case => i [] iy ??.
-  exists i => //; split => //; split => //; exact: is_ray_or_open_open.
-have cIV : closure I `<=` U. 
-  rewrite closureE => z /(_ U); apply; split; first by case: clU.
-  by move=> ? [? [+ _]]; exact.
-have clI : closed I.
-  apply/closure_id; rewrite eqEsubset; split; first exact: subset_closure.
-  move=> z cIi; have Uz : U z by exact: cIV.
-  case: clU => + _;  rewrite openE => /(_ _ Uz).
-  rewrite /interior /= itv_filterE /=; case => i [/is_ray_or_open_open oi iy] siU.
-  case/(_ [set` i]): cIi; first by move: oi; rewrite openE; apply => /=.
-  move=> /= w [[j [jU [oJ jy] jw]]] wi; exists (i `|` j)%O; first last.
-    by apply: le_trans; first exact: iy; exact: leUl.
-  split; first by rewrite itv_setU ?{1}subUset //; exists w; split.
-  split; first by rewrite itv_setU ?{1}subUset //; [exact: openU | exists w].
-  by apply: le_trans; first exact: jy; exact: leUr.
+  rewrite /interior /= itv_nbhsE /=; case => i [] iy ??.
+  by exists i => //; split => //; split => //; exact: itv_open_ends_open.
+have IU : I `<=` U by move=> ? [? [+ _]] => /subset_trans; apply.
 pose V := I `|` `[y,+oo[;  exists V.
+have [? ?] := clopen_bigcup_closed clU Uy.
 split; first split.
-- suff -> : V = I `|` `]y,+oo[ by apply: openU => //; exact: rray_open.
+- suff -> : V = I `|` `]y,+oo[ by apply: openU => //. 
   rewrite eqEsubset; split => z; case; first by left.
   + by rewrite -setU1itv //; case; [move=> -> ; left| right].
   + by left.
   + by rewrite /V -setU1itv //; right; right.
 - apply: closedU => //; apply: rray_closed.
 - by left.
-- case; first by move/subset_closure/cIV.
-  by rewrite set_itvE /= leNgt xy.
-- move=> l r Vr Vl; rewrite ltNge; apply/negP; move: Vl; apply: contra_not.
-  move=> rl; case: Vr; first last.
-    by rewrite set_itvE; move=> yr; right; rewrite set_itvE; apply: (le_trans yr).
-  have /orP [|ly] := le_total y l; first by move=> + _; right; rewrite set_itvE.
-  case=> i [iu [oi] /= yi ri]; left; exists i; first by split.
-  move: iu oi => _ _; case: i yi ri => p q /= /andP [py yq] /andP[pr rq].
-  apply/andP; split. 
-    by apply: (le_trans pr); rewrite /Order.le /=.
-  by apply: (le_trans _ yq); rewrite /Order.le /=.
+- by case; [by move/IU | by rewrite set_itvE /= leNgt xy].
+move=> l r Vr Vl; rewrite ltNge; apply/negP; move: Vl; apply: contra_not.
+move=> rl; case: Vr; first last.
+  by rewrite set_itvE; move=> yr; right; rewrite set_itvE; apply: (le_trans yr).
+have /orP [|ly] := le_total y l; first by move=> + _; right; rewrite set_itvE.
+case=> i [iu [oi] /= yi ri]; left; exists i; first by split.
+move: iu oi => _ _; case: i yi ri => p q /= /andP [py yq] /andP[pr rq].
+apply/andP; split. 
+  by apply: (le_trans pr); rewrite bnd_simp.
+by apply: (le_trans _ yq); rewrite bnd_simp.
 Qed.
 
 End order_topologies.
+Hint Resolve lray_open : core.
+Hint Resolve rray_open : core.
+Hint Resolve itv_open : core.
+Hint Resolve lray_closed : core.
+Hint Resolve rray_closed : core.
+Hint Resolve itv_closed : core.
 
 Section bool_ord_topology.
 Local Open Scope classical_set_scope.
@@ -4331,17 +4263,16 @@ Local Open Scope order_scope.
 
 Local Lemma bool_nbhs_itv (b : bool) : 
   nbhs b = filter_from 
-    (fun i => is_ray_or_open i /\ b \in i)
+    (fun i => itv_open_ends i /\ b \in i)
     (fun i => [set` i]).
 Proof. 
-rewrite discrete_bool eqEsubset.
-split=> U.
-  move/principal_filterP; case: b.
-    move=> Ut; exists `]false, +oo[; first split => //; first by left.
-    by move=> r /=; rewrite in_itv /=; case: r.
-  move=> Ut; exists `]-oo, true[; first split => //; first by left.
+rewrite discrete_bool eqEsubset; split=> U; first last.
+  by case => V [_ Vb] VU; apply/principal_filterP/VU; apply: Vb.
+move/principal_filterP; case: b.
+  move=> Ut; exists `]false, +oo[; first split => //; first by left.
   by move=> r /=; rewrite in_itv /=; case: r.
-case => V [_ Vb] VU; apply/principal_filterP/VU; apply: Vb.
+move=> Ut; exists `]-oo, true[; first split => //; first by left.
+by move=> r /=; rewrite in_itv /=; case: r.
 Qed.
 
 HB.instance Definition _ := Order_isNbhs.Build _ bool bool_nbhs_itv.
@@ -4353,18 +4284,18 @@ Local Open Scope order_scope.
 
 Local Lemma nat_nbhs_itv (n : nat) : 
   nbhs n = filter_from 
-    (fun i => is_ray_or_open i /\ n \in i)
+    (fun i => itv_open_ends i /\ n \in i)
     (fun i => [set` i]).
 Proof. 
-rewrite discrete_nat eqEsubset; split=> U.
-  move/principal_filterP; case: n.
-    move=> U0; exists `]-oo, 1[; first split => //; first by left.
-    by move=> r /=; rewrite in_itv /=; case: r.
-  move=> n USn; exists `]n, n.+2[; first split => //; first by right.
-    by rewrite in_itv; apply/andP;split => //=; rewrite /Order.lt //=.
-  move=> r /=; rewrite in_itv /= => nr2; suff: r = n.+1 by move=>->.
-  by apply/sym_equal; apply: le_anti. 
-case => V [_ Vb] VU; apply/principal_filterP/VU; apply: Vb.
+rewrite discrete_nat eqEsubset; split=> U; first last.
+  by case => V [_ Vb] VU; apply/principal_filterP/VU; apply: Vb.
+move/principal_filterP; case: n.
+  move=> U0; exists `]-oo, 1[; first split => //; first by left.
+  by move=> r /=; rewrite in_itv /=; case: r.
+move=> n USn; exists `]n, n.+2[; first split => //; first by right.
+  by rewrite in_itv; apply/andP;split => //=; rewrite /Order.lt //=.
+move=> r /=; rewrite in_itv /= => nr2; suff: r = n.+1 by move=>->.
+by apply/sym_equal; apply: le_anti. 
 Qed.
 
 HB.instance Definition _ := Order_isNbhs.Build _ nat nat_nbhs_itv.
@@ -4376,16 +4307,16 @@ Section induced_order_topology.
 
 Context {d} {T : orderType d}.
 
-Notation oT := (order_topology T).
+Local Notation oT := (order_topology T).
 
 HB.instance Definition _ := isPointed.Build (interval T) (`]-oo,+oo[).
 
 HB.instance Definition _ := Order.Total.on oT.
 HB.instance Definition _ := @isSubBaseTopological.Build oT 
-  (interval T) (is_ray_itv) (fun i => [set` i]).
+  (interval T) (itv_is_ray) (fun i => [set` i]).
 
 Lemma order_nbhs_itv (x : oT) : nbhs x = filter_from 
-    (fun i => is_ray_or_open i /\ x \in i)
+    (fun i => itv_open_ends i /\ x \in i)
     (fun i => [set` i]).
 Proof.
 rewrite eqEsubset; split => U; first last.
@@ -4394,38 +4325,34 @@ rewrite eqEsubset; split => U; first last.
     exists [set [set` i]]; last by rewrite bigcup_set1.
     move=> ? ->; exists (fset1 i); last by rewrite set_fset1 bigcap_set1.
     by move=> ?; rewrite ?inE => /eqP -> //.
-  case: i xi => /= [[]] // [] //= l [] // [] //= r xlr _.
-  exists `]l,r[%classic; split => //. 
-  exists [set `]l,r[%classic ]; last by rewrite bigcup_set1.
+  case: i xi => [][[]l|[]] [[]r|[]] xlr []//=; exists `]l,r[%classic. 
+  split => //; exists [set `]l,r[%classic ]; last by rewrite bigcup_set1.
   move=> ? ->; exists [fset `]-oo, r[ ; `]l, +oo[]%fset.
     by move=> ?; rewrite ?inE => /orP; case=> /eqP ->.
-  rewrite set_fsetU ?set_fset1 bigcap_setU ?bigcap_set1 /=.
+  rewrite set_fsetU ?set_fset1 bigcap_setU ?bigcap_set1.
   by rewrite (@set_itv_splitI _ _ (`]l,r[)) /= setIC.
-case=> ? [[/= I Irp] <-] [?] /[dup] /(Irp _) [/= F rayF <-] IF Fix IU.
+case=> ? [[ I Irp] <-] [?] /[dup] /(Irp _) [F rayF <-] IF Fix IU.
 pose j := \big[Order.meet/`]-oo,+oo[]_(i <- F) i.
 exists j; first split.
 - rewrite /j.
-  have -> := (@eq_fbig_cond _ _ _ _ _ F) _ (fun x => x \in F) _ id.
-  + apply: big_ind; [by left| exact: is_ray_or_openI|].
+  have -> // := (@eq_fbig_cond _ _ _ _ _ F) _ (fun x => x \in F) _ id.
+  + apply: big_ind; [by left| exact: itv_open_endsI|].
   + by move=> i /rayF /set_mem ?; left.
   + by move=> p /=; rewrite ?inE/=; case: (p \in F).
-  + done.
 - pose f : interval T -> Prop := (fun i => x \in i).
   (suff : f j by done); rewrite /j.
-  have -> := (@eq_fbig_cond _ _ _ _ _ F) _ (fun x => x \in F) _ id.
+  have -> // := (@eq_fbig_cond _ _ _ _ _ F) _ (fun x => x \in F) _ id.
   apply: big_ind => //=; rewrite /f /=; rewrite /in_mem /= /pred_of_itv/=.
   + by move=> ? ?; rewrite lexI => ? ?; apply/andP. 
   + by move=> p /=; rewrite ?inE/=; case: (p \in F).
-  + done.
 suff -> : [set` j] = \bigcap_(i in [set` F]) [set` i].
   by move=> i Fi; apply: IU; exists (\bigcap_(i in [set` F]) [set` i]).
 rewrite -bigsetI_fset_set; last exact: finite_fset; rewrite set_fsetK.
 pose f : (interval T) -> (set T) -> Prop := (fun i j => [set` i] = j).
 suff : f j  (\big[setI/[set: T]]_(i <- F) [set` i]) by done.
-rewrite /j big_mkcond /=; apply: big_ind2; rewrite /f.
-- by rewrite set_itvE.
-- by move=> ? ? ? ? <- <-; rewrite itv_setI.
-- done.
+rewrite /j big_mkcond /=; apply: big_ind2; rewrite /f //.
+  by rewrite set_itvE.
+by move=> ? ? ? ? <- <-; rewrite itv_setI.
 Qed.
 
 HB.instance Definition _ := Order_isNbhs.Build _ oT order_nbhs_itv.
@@ -4444,7 +4371,7 @@ Let WeakU : topologicalType := @weak_topology (sub_type Y) X val.
 
 Lemma open_order_weak (U : set Y) : @open OrdU U -> @open WeakU U.
 Proof.
-rewrite ?openE /= /interior => + x Ux => /(_ x Ux); rewrite itv_filterE /=.
+rewrite ?openE /= /interior => + x Ux => /(_ x Ux); rewrite itv_nbhsE /=.
 move=> [][][[]l|[]] [[]r|[]][][]//= _ xlr /filterS; apply.
 - exists (`]l, r[%classic); split => //=; exists `]\val l, \val r[%classic.
     exact: itv_open.
@@ -5951,7 +5878,7 @@ HB.instance Definition _ (R : numFieldType) :=
     nbhs_ball_normE ball_norm_center ball_norm_symmetric ball_norm_triangle erefl.
 
 Lemma real_order_nbhsE (R : realFieldType) (x : R^o) : nbhs x = 
-  filter_from (fun i => is_ray_or_open i /\ x \in i) (fun i => [set` i]).
+  filter_from (fun i => itv_open_ends i /\ x \in i) (fun i => [set` i]).
 Proof.
 rewrite eqEsubset; split => U.
   case => _ /posnumP[e] xeU.

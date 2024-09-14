@@ -53,6 +53,22 @@
   + Structures `PointedFiltered`, `PointedNbhs`, `PointedUniform`, 
     `PseudoPointedMetric`
 
+- in file `set_interval.v`,
+  + new definitions `itv_is_ray`, `itv_is_bd_open`, and `itv_open_ends`.
+  + new lemmas `itv_open_ends_rside`, `itv_open_ends_rinfty`, 
+    `itv_open_ends_lside`, `itv_open_ends_linfty`, `itv_open_endsI`, 
+    `itv_setU`, and `itv_setI`.
+- in `topology.v`:
+  + Mixin `Order_isNbhs`
+  + Structures `OrderNbhs`, `OrderTopological`, `OrderUniform`, 
+      `OrderPseduoMetric` 
+  + new definition `order_topology`.
+  + new lemmas `discrete_nat`, `rray_open`, `lray_open`, `itv_open`, 
+    `itv_open_ends_open`, `rray_closed`, `lray_closed`, `itv_closed`, 
+    `itv_closure`, `itv_closed_infimums`, `itv_closed_supremums`, 
+    `order_hausdorff`, `clopen_bigcup_clopen`, `zero_dimensional_ray`, 
+    `order_nbhs_itv`, `open_order_weak`, and `real_order_nbhsE`.
+
 ### Changed
 - in `topology.v`:
   + removed the pointed assumptions from `FilteredType`, `Nbhs`, 
