@@ -4060,21 +4060,37 @@ Qed.
 
 End totally_disconnected.
 
-Definition is_ray_itv {d} {T : orderType d} (i : interval T) : Prop := 
+Definition is_ray_itv {d} {T : porderType d} (i : interval T) : Prop := 
   match i with
   | Interval (-oo)%O (BLeft _) => True
   | Interval (BRight _) (+oo)%O => True
   | Interval (-oo)%O (+oo)%O => True
   | _ => False
   end.
-Definition is_open_itv {d} {T : orderType d} (i : interval T) : Prop := 
+Definition is_open_itv {d} {T : porderType d} (i : interval T) : Prop := 
   match i with
   | Interval (BRight _) (BLeft _) => True
   | _ => False
   end.
 
-Definition is_ray_or_open {d} {T : orderType d} (i : interval T) : Prop := 
+Definition is_ray_or_open {d} {T : porderType d} (i : interval T) : Prop := 
   is_ray_itv i \/ is_open_itv i.
+
+Lemma is_ray_or_open_rside {d} {T : porderType d} l b (t : T) : 
+  is_ray_or_open (Interval l (BSide b t)) -> b = true.
+Proof. by case: b; move: l => [[]?|[]] // [] //. Qed.
+
+Lemma is_ray_or_open_rinfty {d} {T : porderType d} l b : 
+  is_ray_or_open (Interval l (BInfty T b)) -> b = false.
+Proof. by case: b => //; move: l => [[]?|[]] // []. Qed.
+
+Lemma is_ray_or_open_lside {d} {T : porderType d} l b (t : T) : 
+  is_ray_or_open (Interval (BSide b t) l) -> b = false.
+Proof. by case: b; move: l => [[]?|[]] // [] //. Qed.
+
+Lemma is_ray_or_open_linfty {d} {T : porderType d} l b : 
+  is_ray_or_open (Interval (BInfty T b) l) -> b = true.
+Proof. by case: b => //; move: l => [[]?|[]] // []. Qed.
 
 Lemma is_ray_or_openI {d} {T : orderType d} (i j : interval T) : 
   is_ray_or_open i -> is_ray_or_open j -> is_ray_or_open (i `&` j)%O.
@@ -4121,22 +4137,22 @@ Proof.
 by rewrite eqEsubset; split => z; rewrite /in_mem/=/pred_of_itv/= lexI => /andP.
 Qed.
 
-
-
-HB.mixin Record Order_isTopological d (T : Type) of Topological T & Order.Total d T := {
-  rray_open : forall (x:T), open `]x,+oo[%classic;
-  lray_open : forall (x:T), open `]-oo,x[%classic;
+(** TODO: generalize this to a partialPreOrder once that's available*)
+HB.mixin Record Order_isNbhs d (T : Type) of Nbhs T & Order.POrder d T := {
+  (** Note that just the intervals `]a,b[ doesn't work when the order has a 
+      top or bottom element, so we also need the rays `]-oo,b[ and ]a,+oo[*)
   itv_filterE : forall (x:T), nbhs x = filter_from 
     (fun i => is_ray_or_open i /\ x \in i)
     (fun i => [set` i])
 }.
 
+#[short(type="orderNbhsType")]
 HB.structure Definition OrderNbhs d := 
-{ T of Nbhs T & Order.Total d T } .
+{ T of Nbhs T & Order.Total d T & Order_isNbhs d T } .
 
 #[short(type="orderTopologicalType")]
 HB.structure Definition OrderTopological d := 
-  { T of Topological T & Order.Total d T & Order_isTopological d T } .
+  { T of Topological T & Order.Total d T & Order_isNbhs d T } .
 
 From mathcomp Require Import set_interval.
 Section order_topologies.
@@ -4144,6 +4160,18 @@ Section order_topologies.
 Local Open Scope order_scope.
 Local Open Scope classical_set_scope.
 Context {d} {T : orderTopologicalType d}.
+
+Lemma rray_open (x : T) : open `]x,+oo[.
+Proof.
+rewrite openE /interior => z xoz; rewrite itv_filterE.
+by exists (`]x, +oo[)%O => //; split => //; left.
+Qed.
+
+Lemma lray_open (x : T) : open `]-oo,x[.
+Proof.
+rewrite openE /interior => z xoz; rewrite itv_filterE.
+by exists (`]-oo, x[)%O => //; split => //; left.
+Qed.
 
 Lemma itv_open (x y : T) : open `]x, y[.
 Proof.
@@ -4184,27 +4212,69 @@ Qed.
 Lemma itv_closed_infimums (A : set T) : A !=set0 -> closed A -> infimums A `<=` A.
 Proof.
 move=> [a0 Aa0] + l [loL] hiL; rewrite closure_id => -> => U.
-rewrite itv_filterE; case; case=> []/=[[]p|[]] [[]q|[]][][] //= _.
-- case E: (`[l,q[ `&` A == set0); first last.
-    case/eqP/eqP/set0P:E => a [lqa ?] lpq pqU; exists a; split => //.
-    apply: pqU; rewrite set_itvE /=; apply/andP;split; rewrite ?(itvP lqa) //.
-    by apply: (@lt_le_trans _ _ l); rewrite ?(itvP lqa) ?(itvP lpq).
-  suff : lbound A q by move/hiL => + lpq; rewrite leNgt (itvP lpq).
-  move=> a Aa; have : (~` (`[l,q[ `&` A)) a by move/eqP: E => ->.
-  rewrite setCI; case; rewrite // setCitv; case; last by move=> /itvP ->.
-  by rewrite /= inE /= /Order.le /= /Order.le /=; rewrite ltNge (loL _ Aa).
-- move=> lp Uoo; exists a0; split => //; apply: Uoo; rewrite set_itvE /=.
-  by apply: (lt_le_trans _ (loL _ Aa0)); rewrite (itvP lp).
-- case E: (`[l,q[ `&` A == set0); first last.
-    case/eqP/eqP/set0P:E => a [lqa ?] lpq pqU; exists a; split => //.
-    by apply: pqU; rewrite set_itvE /= ?(itvP lqa).
-  suff : lbound A q by move/hiL => + lpq; rewrite leNgt (itvP lpq).
-  move=> a Aa; have : (~` (`[l,q[ `&` A)) a by move/eqP: E => ->.
-  rewrite setCI; case; rewrite // setCitv; case; last by move=> /itvP ->.
-  by rewrite /= inE /= /Order.le /= /Order.le /=; rewrite ltNge (loL _ Aa).
-- by move=> _; rewrite set_itvE subTset => ->; exists a0; split.
+rewrite itv_filterE; case; case => /= p q []. 
+case E: ([set` Interval (BSide true l) q] `&` A == set0); first last.
+  case/eqP/eqP/set0P:E => a [lqa ?] ? lpq pqU; exists a; split => //.
+  apply: pqU; move: lpq lqa; rewrite /= ?inE => lpq /le_trans; apply.
+  by move: lpq => /andP [? ?]; apply/andP.
+case: q E.
+  move=> b q /[swap] /is_ray_or_open_rside -> E lpq ; suff : lbound A q. 
+    move/hiL => + _; rewrite leNgt; apply: contraNP => _. 
+    by move: lpq; rewrite in_itv => /andP [].
+  move=> a Aa; have : (~`(`[l,q[ `&` A)) a by move/eqP: E => ->.
+  rewrite setCI; case; rewrite // setCitv /= ?in_itv //= ?Bool.andb_true_r //=. 
+  by case => //; rewrite ltNge; rewrite (loL _ Aa).
+move=> b _ /is_ray_or_open_rinfty -> lpo poU; exists a0; split => //.
+apply: poU; move: lpo; rewrite /= ?itv_boundlr /= => /andP [pl _]; apply/andP.
+by split => //; apply: (le_trans pl); apply: loL.
 Qed.
 
+Lemma itv_closed_supremums (A : set T) : A !=set0 -> closed A -> supremums A `<=` A.
+Proof.
+move=> [a0 Aa0] + l [upL] lbL; rewrite closure_id => -> => U.
+rewrite itv_filterE; case; case => /= p q []. 
+case E: ([set` Interval p (BSide false l)] `&` A == set0); first last.
+  case/eqP/eqP/set0P:E => a [lqa ?] ? lpq pqU; exists a; split => //.
+  apply: pqU; move: lpq lqa; rewrite /= ?inE => lpq /le_trans; apply.
+  by move: lpq => /andP [? ?]; apply/andP.
+case: p E.
+  move=> b p /[swap] /is_ray_or_open_lside -> E lpq ; suff : ubound A p. 
+    move/lbL => + _; rewrite leNgt; apply: contraNP => _. 
+    by move: lpq; rewrite in_itv => /andP [].
+  move=> a Aa; have : (~`(`]p,l] `&` A)) a by move/eqP: E => ->.
+  rewrite setCI; case; rewrite // setCitv /= ?in_itv //= ?Bool.andb_true_r //=. 
+  by case => //; rewrite ltNge; rewrite (upL _ Aa).
+move=> b _ /is_ray_or_open_linfty -> lpo poU; exists a0; split => //.
+apply: poU; move: lpo; rewrite /= ?itv_boundrl /= => /andP [_ pl]; apply/andP.
+by split => //; apply: (le_trans _ pl); apply: upL.
+Qed.
+
+Lemma order_hausdorff : hausdorff_space T.
+Proof.
+rewrite open_hausdorff=> p q. 
+wlog : p q / p < q.
+  have /orP [] := le_total p q; rewrite le_eqVlt => /orP [/eqP ->|].
+  - by rewrite eqxx.
+  - by move=> ?; apply.
+  - by rewrite eqxx.
+  - move=> qp WH; rewrite eq_sym => qNp; have := WH _ _ qp qNp.
+    case; case=> P Q => [[]] ? ? [] ? ? ?; exists (Q,P); split => //.
+    by rewrite setIC.
+move=> plq ?; case: (pselect (exists z, p < z < q)).
+  case=> z /andP [pz qz]; exists (`]-oo,z[, `]z,+oo[).
+    by split => //=; apply/mem_set; rewrite set_itvE.
+  split => //=;[exact: lray_open| exact: rray_open |].
+  apply/eqP; rewrite -subset0 => r; rewrite ?set_itvE; case => /= rz zr.
+  by (suff : r < z < r by rewrite lte_anti); rewrite rz zr.
+move=> npzq; exists (`]-oo,q[, `]p,+oo[); split => //=.
+- by apply /mem_set; rewrite set_itvE.
+- by apply /mem_set; rewrite set_itvE.
+- exact: lray_open.
+- exact: rray_open.
+apply/eqP; rewrite -subset0 => r; rewrite ?set_itvE; case => /= rz zr.
+by apply: npzq; exists r; rewrite rz zr.
+Qed.
+  
 Lemma zero_dimensional_ray (x y : T) : x < y -> zero_dimensional T -> 
   exists U, [/\ clopen U, U y , ~ U x & forall l r, U r -> ~ U l -> l < r ].
 Proof.
@@ -4258,11 +4328,6 @@ End order_topologies.
 Section bool_ord_topology.
 Local Open Scope classical_set_scope.
 Local Open Scope order_scope.
-Local Lemma bool_lray (b : bool) : open (`]-oo,b[%classic).
-Proof. exact: discrete_open. Qed.
-    
-Local Lemma bool_rray (b : bool) : open (`]b,+oo[%classic).
-Proof. exact: discrete_open. Qed.
 
 Local Lemma bool_nbhs_itv (b : bool) : 
   nbhs b = filter_from 
@@ -4279,18 +4344,12 @@ split=> U.
 case => V [_ Vb] VU; apply/principal_filterP/VU; apply: Vb.
 Qed.
 
-HB.instance Definition _ := Order_isTopological.Build _ bool
-  bool_rray bool_lray bool_nbhs_itv.
+HB.instance Definition _ := Order_isNbhs.Build _ bool bool_nbhs_itv.
 End bool_ord_topology.
 
 Section nat_ord_topology.
 Local Open Scope classical_set_scope.
 Local Open Scope order_scope.
-Local Lemma nat_lray (n : nat) : open (`]-oo,n[%classic).
-Proof. by apply: discrete_open; exact: discrete_nat. Qed.
-
-Local Lemma nat_rray (n : nat) : open (`]n,+oo[%classic).
-Proof. by apply: discrete_open; exact: discrete_nat. Qed.
 
 Local Lemma nat_nbhs_itv (n : nat) : 
   nbhs n = filter_from 
@@ -4308,8 +4367,7 @@ rewrite discrete_nat eqEsubset; split=> U.
 case => V [_ Vb] VU; apply/principal_filterP/VU; apply: Vb.
 Qed.
 
-HB.instance Definition _ := Order_isTopological.Build _ nat
-  nat_rray nat_lray nat_nbhs_itv.
+HB.instance Definition _ := Order_isNbhs.Build _ nat nat_nbhs_itv.
 
 End nat_ord_topology.
 
@@ -4325,22 +4383,6 @@ HB.instance Definition _ := isPointed.Build (interval T) (`]-oo,+oo[).
 HB.instance Definition _ := Order.Total.on oT.
 HB.instance Definition _ := @isSubBaseTopological.Build oT 
   (interval T) (is_ray_itv) (fun i => [set` i]).
-
-Lemma order_lray (x : oT) : open `]-oo,x[%classic .
-Proof.
-exists [set (`]-oo,x[)%classic]; last by rewrite bigcup_set1.
-move=> ? -> => //=; exists (fset1 (`]-oo,x[)).
-  by move=> /= ?; rewrite ?inE => /eqP -> //.
-by rewrite set_fset1 bigcap_set1.
-Qed.
-
-Lemma order_rray (x : oT) : open `]x,+oo[%classic .
-Proof.
-exists [set (`]x,+oo[)%classic]; last by rewrite bigcup_set1.
-move=> ? -> => //=; exists (fset1 (`]x,+oo[)).
-  by move=> /= ?; rewrite ?inE => /eqP -> //.
-by rewrite set_fset1 bigcap_set1.
-Qed.
 
 Lemma order_nbhs_itv (x : oT) : nbhs x = filter_from 
     (fun i => is_ray_or_open i /\ x \in i)
@@ -4386,10 +4428,8 @@ rewrite /j big_mkcond /=; apply: big_ind2; rewrite /f.
 - done.
 Qed.
 
-HB.instance Definition _ := Order_isTopological.Build _ oT
-  order_rray order_lray order_nbhs_itv.
+HB.instance Definition _ := Order_isNbhs.Build _ oT order_nbhs_itv.
 End induced_order_topology.
-
 
 (** for an orderedTopologicalType T, and subtype U
     (order_topology (sub_type U)) `<=` (weak_topology (sub_type U))
@@ -4419,7 +4459,6 @@ move=> [][][[]l|[]] [[]r|[]][][]//= _ xlr /filterS; apply.
 Qed.
 
 End weak_order_refine.
-(*
 
 (** Uniform spaces *)
 
@@ -5911,6 +5950,41 @@ HB.instance Definition _ (R : numFieldType) :=
   Nbhs_isPseudoMetric.Build R R^o
     nbhs_ball_normE ball_norm_center ball_norm_symmetric ball_norm_triangle erefl.
 
+Lemma real_order_nbhsE (R : realFieldType) (x : R^o) : nbhs x = 
+  filter_from (fun i => is_ray_or_open i /\ x \in i) (fun i => [set` i]).
+Proof.
+rewrite eqEsubset; split => U.
+  case => _ /posnumP[e] xeU.
+  exists (`]x-e%:num, x+e%:num[); first split; first right => //.
+    rewrite in_itv /= -real_lter_distl subrr // normr0 //.
+  apply: (subset_trans _ xeU) => z. 
+  by rewrite /= in_itv /= -real_lter_distl //= distrC.
+case => [][[[]l|[]]] [[]r|[]] [[]]//= _.
+move=> xlr lrU.
+- exists (Order.min (x - l) (r - x))%R.
+     by rewrite /= lt_min ?lterBDr ?add0r; rewrite ?(itvP xlr).
+  apply: (subset_trans _ lrU); apply/subset_ball_prop_in_itv.
+  suff : (`]x - Order.min (x-l) (r-x), x + Order.min (x-l) (r-x)[ <= `]l,r[)%O.
+    by move/subitvP => H ? ?; apply: H.
+  apply/andP; rewrite ?lteBSide //=; split => //=.
+    apply: (@le_trans _ _ (x - (x-l))); first by rewrite opprB addrCA subrr addr0.
+    by rewrite lerB // ge_min lexx.
+  apply: (@le_trans _ _ (x + (r-x))); last by rewrite addrCA subrr addr0.
+  by rewrite lerD // ge_min lexx orbT.
+- move=> xl lU; exists (x - l) => /=; first by rewrite ?lterBDr ?add0r (itvP xl).
+  apply: (subset_trans _ lU); apply/subset_ball_prop_in_itv.
+  suff : (`]x - (x-l), x + (x-l)[ <= `]l,+oo[)%O.
+    by move/subitvP => H ?; apply: H.
+  by apply/andP; rewrite ?lteBSide //=; split; rewrite // opprB addrCA subrr addr0.
+- move=> xr rU; exists (r - x) => /=; first by rewrite ?lterBDr ?add0r (itvP xr).
+  apply: (subset_trans _ rU); apply/subset_ball_prop_in_itv.
+  suff : (`]x - (r-x), x + (r-x)[ <= `]-oo,r[)%O.
+    by move/subitvP => H ?; apply: H.
+  by apply/andP; rewrite ?lteBSide //=; split; rewrite // addrCA subrr addr0.
+- by move=> _; rewrite set_itvE subTset => ->; exists 1 => //=.
+Qed.
+
+
 Module numFieldTopology.
 
 #[export, non_forgetful_inheritance]
@@ -5924,6 +5998,10 @@ HB.instance Definition _ (R : archiFieldType) := PseudoPointedMetric.copy R R^o.
 
 #[export, non_forgetful_inheritance]
 HB.instance Definition _ (R : realFieldType) := PseudoPointedMetric.copy R R^o.
+
+#[export, non_forgetful_inheritance]
+HB.instance Definition _ (R : realFieldType) := 
+  Order_isNbhs.Build _ R (@real_order_nbhsE R).
 
 #[export, non_forgetful_inheritance]
 HB.instance Definition _ (R : numClosedFieldType) := PseudoPointedMetric.copy R R^o.
@@ -5970,18 +6048,10 @@ exists (x + e%:num / 2)%R; apply: Ae; last first.
 rewrite /ball /= opprD addrA subrr distrC subr0 ger0_norm //.
 by rewrite {2}(splitr e%:num) ltr_pwDl.
 Qed.
+HB.about realFieldType.
 
 Lemma Rhausdorff (R : realFieldType) : hausdorff_space R.
-Proof.
-move=> x y clxy; apply/eqP; rewrite eq_le.
-apply/in_segmentDgt0Pr => _ /posnumP[e].
-rewrite in_itv /= -ler_distl; have he : 0 < e%:num / 2 by [].
-have [z [zx_he yz_he]] := clxy _ _ (nbhsx_ballx x _ he) (nbhsx_ballx y _ he).
-have := ball_triangle yz_he (ball_sym zx_he).
-by rewrite -mulr2n -(mulr_natr (_ / _) 2) divfK// => /ltW.
-Qed.
-
-
+Proof. exact: order_hausdorff. Qed.
 
 Definition dense (T : topologicalType) (S : set T) :=
   forall (O : set T), O !=set0 -> open O -> O `&` S !=set0.
@@ -7191,4 +7261,3 @@ Qed.
 Local Close Scope relation_scope.
 
 #[global] Hint Resolve uniform_regular : core.
-*)
