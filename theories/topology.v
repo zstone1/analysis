@@ -4192,8 +4192,8 @@ apply/eqP; rewrite -subset0 => r; rewrite ?set_itvE; case => /= rz zr.
 by apply: npzq; exists r; rewrite rz zr.
 Qed.
 
-Lemma clopen_bigcup_clopen (x : T) (U : set T) : clopen U -> U x -> 
-  clopen (\bigcup_(i in [set i : interval T | 
+Lemma clopen_bigcup_clopen (x : T) (U : set T) : clopen U -> U x ->
+  clopen (\bigcup_(i in [set i : interval T |
     [set` i] `<=` U /\ open [set` i] /\ x \in i]) [set` i]).
 Proof.
 pose I := (\bigcup_(i in [set i : interval T | 
@@ -4215,7 +4215,7 @@ split; first by rewrite itv_setU ?{1}subUset //; [exact: openU | exists w].
 by apply: le_trans; first exact: jy; exact: leUr.
 Qed.
 
-Lemma zero_dimensional_ray (x y : T) : x < y -> zero_dimensional T -> 
+Lemma zero_dimensional_ray (x y : T) : x < y -> zero_dimensional T ->
   exists U, [/\ clopen U, U y , ~ U x & forall l r, U r -> ~ U l -> l < r ].
 Proof.
 move=> xy zt; have xNy : y != x.
@@ -4229,7 +4229,7 @@ have Iy : I y.
   by exists i => //; split => //; split => //; exact: itv_open_ends_open.
 have IU : I `<=` U by move=> ? [? [+ _]] => /subset_trans; apply.
 pose V := I `|` `[y,+oo[;  exists V.
-have [? ?] := clopen_bigcup_closed clU Uy.
+have [? ?] := clopen_bigcup_clopen clU Uy.
 split; first split.
 - suff -> : V = I `|` `]y,+oo[ by apply: openU => //. 
   rewrite eqEsubset; split => z; case; first by left.
@@ -5976,7 +5976,6 @@ exists (x + e%:num / 2)%R; apply: Ae; last first.
 rewrite /ball /= opprD addrA subrr distrC subr0 ger0_norm //.
 by rewrite {2}(splitr e%:num) ltr_pwDl.
 Qed.
-HB.about realFieldType.
 
 Lemma Rhausdorff (R : realFieldType) : hausdorff_space R.
 Proof. exact: order_hausdorff. Qed.
