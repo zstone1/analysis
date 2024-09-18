@@ -177,7 +177,7 @@ have {oA} := oA _ Af; rewrite /interior => nAf.
 apply: (@filterS _ _ _ ((dfwith f i) @^-1` A)).
   by move=> w Apw; exists (dfwith f i w) => //; rewrite projK.
 apply: dfwith_continuous => /=; move: nAf; congr (nbhs _ A).
-by apply: functional_extensionality_dep => ?; case: dfwithP.
+apply: functional_extensionality_dep => ?. case: dfwithP.
 Qed.
 
 Lemma hausdorff_product :

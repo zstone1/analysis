@@ -3,7 +3,7 @@ From mathcomp Require Import all_ssreflect ssralg ssrint ssrnum interval rat.
 From mathcomp Require Import finmap.
 From mathcomp Require Import mathcomp_extra boolp classical_sets functions.
 From mathcomp Require Import cardinality.
-From mathcomp Require Import reals signed topology function_spaces.
+From mathcomp Require Import reals signed topology function_spaces set_interval.
 From HB Require Import structures.
 
 (**md**************************************************************************)
@@ -85,6 +85,599 @@ split.
 - exact: cantor_space_hausdorff.
 - exact: cantor_zero_dimensional.
 Qed.
+
+Section big_lexi_order.
+
+Context {K : nat -> eqType} .
+
+Definition share_prefix n (t1 t2: forall n, K n) :=
+  (forall m, (m < n)%O -> t1 m = t2 m).
+
+Lemma share_prefix0 t1 t2 : share_prefix 0 t1 t2.
+Proof. by rewrite /share_prefix. Qed.
+
+Hint Resolve share_prefix0 : core.
+
+Lemma share_prefixC n t1 t2 : share_prefix n t1 t2 <-> share_prefix n t2 t1.
+Proof. by rewrite /share_prefix; split => + m mn => /(_ m mn). Qed.
+
+Lemma share_prefixS n m t1 t2 : 
+  n <= m -> share_prefix m t1 t2 -> share_prefix n t1 t2.
+Proof. 
+move=> nm + r rn; apply; move: nm; rewrite leq_eqVlt => /orP.
+by case=>[/eqP <- //|/(ltn_trans rn)]; exact.
+Qed.
+
+Lemma share_prefix_refl n x : share_prefix n x x.
+Proof. by move=> ? ?. Qed.
+
+Lemma share_prefix_trans n x y z : 
+  share_prefix n x y -> 
+  share_prefix n y z -> 
+  share_prefix n x z. 
+Proof. by move=> + + m mn => /(_ _ mn) ->; apply. Qed.
+
+Definition first_diff (t1 t2: forall n, K n) : option nat :=
+  xget None (Some  @` [set n | share_prefix n t1 t2 /\ t1 n <> t2 n]).
+
+Lemma first_diffC t1 t2 : first_diff t1 t2 = first_diff t2 t1.
+Proof.
+by rewrite /first_diff /=; congr (_ _ _); rewrite eqEsubset; split => z /=;
+  (case => w [wE /nesym NE]; exists w => //; split);
+  rewrite // share_prefixC.
+Qed.
+
+Lemma first_diff_unique (x y : forall n, K n) : forall (n m : nat), 
+  (share_prefix n x y /\ x n <> y n) ->
+  (share_prefix m x y /\ x m <> y m) ->
+  n = m.
+Proof.
+move=> n m [nPfx xyn] [mPfx xym]; apply/eqP.
+apply: contrapT; move/negP; rewrite neq_ltn => /orP; case => RN.
+  by move: xyn; have -> := mPfx _ RN.
+by move: xym; have -> := nPfx _ RN.
+Qed.
+ 
+Lemma first_diff_SomeP x y n : 
+  first_diff x y = Some n <-> share_prefix n x y /\ x n <> y n.
+Proof.
+split.
+  rewrite /first_diff; case: xgetP=> // ? -> []? [+ + <-/Some_inj nE]. 
+  by rewrite {}nE /= => ? ?; split.
+case=> pfx xNy; rewrite /first_diff; case: xgetP => //=; first last.
+  by move/(_ (Some n)); apply: absurd; exists n.
+case; last by move => ? [].
+by move=> m -> [o] [? ?] <-; congr(_ _); apply: (@first_diff_unique x y). 
+Qed.
+
+Lemma first_diff_NoneP t1 t2 : t1 = t2 <-> first_diff t1 t2 = None.
+Proof.
+split; rewrite /first_diff.
+  by move=> ->; case: xgetP => //; case => // ? ? [? /=] []//.
+case: xgetP; first by move=> ? -> [i /=] [?] ? <-.
+move=> /= R _; apply/functional_extensionality_dep.
+suff : forall n, forall x, x < n -> t1 x = t2 x.
+  by move=> + n => /(_ n.+1)/(_ n); apply.
+elim; first by move=> ?.
+move=> n IH x; rewrite leq_eqVlt => /orP [/eqP/succn_inj ->|xn]; last exact: IH.
+have /forall2NP/(_ n) [] := R (Some n) => // /not_andP.
+case; first by case/existsNP=> m /not_implyP [//] mx; apply: absurd; apply/IH.
+by move/contrapT ->.
+Qed.
+
+Lemma first_diff_lt a x y n m : 
+  n < m ->
+  first_diff a x = Some n ->
+  first_diff a y = Some m ->
+  first_diff x y = Some n.
+Proof.
+move=> nm /first_diff_SomeP [xpfx xE] /first_diff_SomeP [ypfx yE]. 
+apply/first_diff_SomeP; split.
+  by move=> o /[dup] on /xpfx <-; apply: ypfx; apply: (ltn_trans on).
+by have <- := ypfx _ nm; exact/nesym.
+Qed.
+
+Lemma first_diff_eq a x y n m : 
+  first_diff a x = Some n ->
+  first_diff a y = Some n ->
+  first_diff x y = Some m -> 
+  n <= m.
+Proof.
+case/first_diff_SomeP => axPfx axn /first_diff_SomeP [ayPfx ayn].
+case/first_diff_SomeP => xyPfx; rewrite leqNgt; apply: contra_notN => mn.
+by have <- := ayPfx _ mn; have <- := axPfx _ mn.
+Qed.
+
+Lemma first_diff_dfwith x i b : 
+  (x i) <> b <-> first_diff x (@dfwith _ K x i b) = Some i.
+Proof.
+split; first last.
+  by case/first_diff_SomeP => _ /=; apply: contra_not; rewrite dfwithin.
+move=> xNb; apply/first_diff_SomeP; split; last by rewrite dfwithin.
+move=> n ni; apply/eqP; rewrite dfwithout //.
+by apply/negP => /eqP E; move: ni; rewrite E ltexx.
+Qed.
+
+Definition lexi_bigprod  (R : forall n, K n -> K n -> bool) (t1 t2 : forall n, K n) :=
+  match first_diff t1 t2 with  
+  | Some n => R n (t1 n) (t2 n)
+  | None => true
+  end.
+
+Lemma lexi_bigprod_reflexive R : reflexive (lexi_bigprod R).
+Proof.
+move=> x; rewrite /lexi_bigprod /=.
+rewrite /lexi_bigprod/first_diff.
+by case: xgetP => //=; case=> // n /= _ [m [/= _]].
+Qed.
+
+Lemma lexi_bigprod_anti R : (forall n, antisymmetric (R n)) ->
+  antisymmetric (lexi_bigprod R).
+Proof.
+move=> antiR x y /andP [xy yx]; apply/first_diff_NoneP; move: xy yx.
+rewrite /lexi_bigprod first_diffC; case E: (first_diff y x) => [n|]// ? ?.
+case/first_diff_SomeP: E => _; apply: contra_notP => _.
+by apply: antiR; apply/andP; split.
+Qed.
+
+Lemma lexi_bigprod_trans R : 
+  (forall n, transitive (R n)) -> 
+  (forall n, antisymmetric (R n)) -> 
+  transitive (lexi_bigprod R).
+move=> Rtrans Ranti y x z; rewrite /lexi_bigprod /=.
+case Ep: (first_diff x y) => [p|]; last by move/first_diff_NoneP: Ep ->.
+case Er: (first_diff x z) => [r|]; last by move/first_diff_NoneP: Er ->.
+case Eq: (first_diff y z) => [q|]; first last.
+  by move: Ep Er; move/first_diff_NoneP: Eq => -> -> /Some_inj ->. 
+have := leqVgt p q; rewrite leq_eqVlt => /orP [/orP[]|].
+- move=> /eqP pqE; move: Ep Eq; rewrite pqE => Eqx Eqz.
+  rewrite first_diffC in Eqx; have := first_diff_eq Eqx Eqz Er.
+  rewrite leq_eqVlt => /orP [/eqP ->|qr]; first by exact: Rtrans.
+  case/first_diff_SomeP:Er => /(_ _ qr) -> _ ? ?; have : z q = y q.
+    by apply: Ranti; apply/andP; split.
+  by move=> E; case/first_diff_SomeP: Eqz=> + /nesym; rewrite E.
+- move=> pq; move: Er.
+  rewrite (@first_diff_lt y x z _ _ pq) ?[_ y x]first_diffC //.
+  by move/Some_inj <- => ? _; case/first_diff_SomeP:Eq => /(_ _ pq) <-.
+- move=> qp; move: Er.
+  rewrite first_diffC (@first_diff_lt y _ _ _ _ qp) // ?[_ y x]first_diffC //.
+  by move/Some_inj <- => _ ?; case/first_diff_SomeP:Ep => /(_ _ qp) ->.
+Qed.
+
+Lemma lexi_bigprod_total R : (forall n, total (R n)) -> total (lexi_bigprod R).
+Proof.
+move=> Rtotal; move=> x y.
+case E : (first_diff x y) => [n|]; first last.
+  by move/first_diff_NoneP:E ->; rewrite lexi_bigprod_reflexive.
+rewrite /lexi_bigprod E first_diffC E; exact: Rtotal.
+Qed.
+
+Definition start_with n (t1 t2: forall n, K n) (i : nat) : K i := 
+  if (i < n)%O then t1 i else t2 i.
+
+Lemma start_with_prefix n x y : share_prefix n x (start_with n x y).
+Proof. by move=> r rn; rewrite /start_with rn. Qed.
+
+End big_lexi_order.
+
+Definition big_lexi_order {I : Type} (T : I -> Type) : Type := forall i, T i.
+HB.instance Definition _ (I : Type) (K : I -> choiceType) := 
+  Choice.on (big_lexi_order K).
+
+Section big_lexi_porder.
+Context {d} {K : nat -> porderType d}.
+
+Definition big_lexi_ord : rel (big_lexi_order K) := 
+  lexi_bigprod (fun n k1 k2 => k1 <= k2)%O.
+
+Lemma big_lexi_ord_reflexive : reflexive big_lexi_ord.
+Proof. exact: lexi_bigprod_reflexive. Qed.
+
+Lemma big_lexi_ord_anti : antisymmetric big_lexi_ord.
+Proof. by apply: lexi_bigprod_anti => n; exact: le_anti. Qed.
+
+Lemma big_lexi_ord_trans : transitive big_lexi_ord.
+Proof. by apply: lexi_bigprod_trans=> n; [exact: le_trans| exact: le_anti]. Qed.
+
+HB.instance Definition _ := Order.Le_isPOrder.Build d (big_lexi_order K)
+  big_lexi_ord_reflexive big_lexi_ord_anti big_lexi_ord_trans.
+End big_lexi_porder.
+
+Section big_lexi_total.
+Context {d} {K : nat -> orderType d}.
+
+Lemma big_lexi_ord_total : total (@big_lexi_ord _ K).
+Proof. by apply: lexi_bigprod_total => ?; exact: le_total. Qed.
+
+HB.instance Definition _ := Order.POrder_isTotal.Build _ 
+  (big_lexi_order K) big_lexi_ord_total.
+
+End big_lexi_total.
+
+Section big_lexi_bottom.
+Context {d} {K : nat -> finOrderType d}.
+
+Lemma big_lex_bot x : (@big_lexi_ord _ K) (fun=> \bot)%O x.
+Proof. 
+rewrite /big_lexi_ord/lexi_bigprod; case E: (first_diff _ _) => //.
+exact: le0x.
+Qed.
+
+HB.instance Definition _ := @Order.hasBottom.Build _ 
+  (big_lexi_order K) (fun=> \bot)%O big_lex_bot.
+
+End big_lexi_bottom.
+
+Section big_lexi_top.
+Context {d} {K : nat -> finOrderType d}.
+
+Lemma big_lex_top x : (@big_lexi_ord _ K) x (fun=> \top)%O.
+Proof. 
+rewrite /big_lexi_ord/lexi_bigprod; case E: (first_diff _ _) => //.
+exact: lex1.
+Qed.
+
+HB.instance Definition _ := @Order.hasTop.Build _ 
+  (big_lexi_order K) (fun=> \top)%O big_lex_top.
+
+End big_lexi_top.
+
+Lemma tree_prefix {K : nat -> topologicalType} (b : (prod_topology K)) (n : nat) :
+  (forall n, discrete_space (K n)) ->
+  \forall c \near b, share_prefix n b c. 
+Proof.
+move=> dscK; elim: n => [|n IH]; first by near=> z => ?.
+near=> z => i; rewrite /Order.lt /= ltnS leq_eqVlt.
+move=> /predU1P[|iSn]; last by rewrite (near IH z).
+move=> ->; near: z; exists (proj n @^-1` [set b n]).
+split => //; suff : @open (prod_topology K) (proj n @^-1` [set b n]) by [].
+apply: open_comp; [move=> + _; exact: proj_continuous| apply: discrete_open].
+exact: dscK.
+Unshelve. all: end_near. Qed.
+
+Lemma lexi_bigprod_prefix_lt {d} (K : nat -> orderType d) 
+    (b a x: big_lexi_order K) n: 
+  (a < b)%O -> 
+  first_diff a b = Some n ->
+  share_prefix n.+1 x b ->
+  (a < x)%O.
+Proof.
+move=> + /[dup] abD /first_diff_SomeP [pfa abN].
+case E1 : (first_diff a x) => [m|]; first last.
+  by move/first_diff_NoneP:E1 <- => _ /(_ n (ltnSn _)).
+move=> ab pfx; apply/andP; split.
+  by apply/negP => /eqP/first_diff_NoneP; rewrite first_diffC E1.
+move: ab; rewrite /Order.lt/= => /andP [?].
+rewrite /big_lexi_ord /lexi_bigprod E1 abD; suff : n = m. 
+  by have := pfx n (ltnSn _) => /[swap] -> ->.
+apply: (@first_diff_unique _ a x) => //=; last by case/first_diff_SomeP:E1.
+split; last by by have -> := pfx n (ltnSn _).
+by apply: (share_prefix_trans pfa); rewrite share_prefixC; exact: share_prefixS.
+Qed.
+
+Lemma lexi_bigprod_prefix_gt {d} (K : nat -> orderType d) 
+    (b a x: big_lexi_order K) n:
+  (b < a)%O -> 
+  first_diff a b = Some n ->
+  share_prefix n.+1 x b ->
+  (x < a)%O.
+Proof.
+move=> + /[dup] abD /first_diff_SomeP [pfa abN].
+case E1 : (first_diff x a) => [m|]; first last.
+  by move/first_diff_NoneP:E1 -> => _ /(_ n (ltnSn _)).
+move=> ab pfx; apply/andP; split.
+  by apply/negP => /eqP/first_diff_NoneP; rewrite first_diffC E1.
+move: ab; rewrite /Order.lt/= => /andP [?].
+rewrite /big_lexi_ord /lexi_bigprod [_ b a]first_diffC E1 abD; suff : n = m. 
+  by have := pfx n (ltnSn _) => /[swap] -> ->.
+apply: (@first_diff_unique _ x a) => //=; last by case/first_diff_SomeP:E1.
+rewrite share_prefixC; split; last by have -> := pfx n (ltnSn _); apply/nesym.
+by apply: (share_prefix_trans pfa); rewrite share_prefixC; exact: share_prefixS.
+Qed.
+
+Lemma big_lexi_interval_prefix {d} (K : nat -> orderType d) 
+    (i : interval (big_lexi_order K))
+    (x : big_lexi_order K) : 
+  itv_open_ends i ->
+  x \in i ->
+  exists n, (share_prefix n x `<=` [set` i]).
+Proof.
+move: i; case=> [][[]l|[]] [[]r|[]] [][]; rewrite ?in_itv /= ?andbT.
+- move=> /andP [] lx xr. 
+  case E1 : (first_diff l x) => [m|]; first last.
+    by move: lx; move/first_diff_NoneP: E1 ->; rewrite bnd_simp.
+  case E2 : (first_diff x r) => [n|]; first last.
+    by move: xr; move/first_diff_NoneP: E2 ->; rewrite bnd_simp.
+  exists (Order.max n m).+1 => p xppfx; rewrite set_itvE. 
+  apply/andP; split. 
+    apply: (lexi_bigprod_prefix_lt lx E1) => w wm; apply/sym_equal/xppfx.
+    by move/ltnSE/leq_ltn_trans: wm; apply; rewrite ltnS leq_max leqnn orbT.
+  rewrite first_diffC in E2.
+  apply: (lexi_bigprod_prefix_gt xr E2) => w wm; apply/sym_equal/xppfx.
+  by move/ltnSE/leq_ltn_trans: wm; apply; rewrite ltnS leq_max leqnn.
+- move=> lx. 
+  case E1 : (first_diff l x) => [m|]; first last.
+    by move: lx; move/first_diff_NoneP: E1 ->; rewrite bnd_simp.
+  exists m.+1 => p xppfx; rewrite set_itvE /=.
+  by apply: (lexi_bigprod_prefix_lt lx E1) => w wm; apply/sym_equal/xppfx.
+- move=> xr. 
+  case E2 : (first_diff x r) => [n|]; first last.
+    by move: xr; move/first_diff_NoneP: E2 ->; rewrite bnd_simp.
+  exists n.+1; rewrite first_diffC in E2 => p xppfx. 
+  rewrite set_itvE /=.
+  by apply: (lexi_bigprod_prefix_gt xr E2) => w wm; apply/sym_equal/xppfx.
+by move=> _; exists 0=> ? ?; rewrite set_itvE.
+Unshelve. all: end_near. Qed.
+
+Lemma lexi_bigprod_between {d} (K : nat -> orderType d) 
+    (a x b: big_lexi_order K) n:
+  (a <= x <= b)%O -> 
+  share_prefix n a b -> 
+  share_prefix n x a. 
+Proof.
+move=> axb; elim: n => // n IH.
+move=> pfxSn m mSn; have pfxA : share_prefix n a x.
+  by rewrite share_prefixC; apply: IH; apply: (share_prefixS _  pfxSn).
+have pfxB : share_prefix n x b.
+  apply (@share_prefix_trans _ n x a b); first by rewrite share_prefixC.
+  exact: (share_prefixS _  pfxSn).
+move: mSn; rewrite /Order.lt/= ltnS leq_eqVlt => /orP []; first last.
+  by move: pfxA; rewrite share_prefixC; exact.
+move/eqP ->; apply: le_anti; apply/andP; split.
+  case/andP:axb => ? +; rewrite {1}/Order.le/=/big_lexi_ord/lexi_bigprod.
+  have -> := pfxSn n (ltnSn _).
+  case E : (first_diff x b) => [r|]; last by move/first_diff_NoneP:E ->.
+  move=> xrb; have : n <= r. 
+    rewrite leqNgt; apply/negP=> /[dup] /pfxB xbE.
+    by case/first_diff_SomeP:E => _; rewrite xbE. 
+  rewrite leq_eqVlt => /orP [/eqP -> //|] => nr.
+  by case/first_diff_SomeP:E => /(_ n nr) ->. 
+case/andP:axb => + ?; rewrite {1}/Order.le/=/big_lexi_ord/lexi_bigprod.
+case E : (first_diff a x) => [r|]; last by move/first_diff_NoneP:E <-. 
+move=> xrb; have : n <= r. 
+  rewrite leqNgt; apply/negP=> /[dup] /pfxA xbE.
+  by case/first_diff_SomeP:E => _; rewrite xbE. 
+rewrite leq_eqVlt => /orP [/eqP -> //|] => nr.
+by case/first_diff_SomeP:E => /(_ n nr) ->. 
+Qed.
+
+Section foo.
+Context {d} {K : nat -> finOrderType d}.
+Let oT := order_topology (big_lexi_order K).
+
+Lemma shared_prefix_closed_itv n (x : oT) :
+  share_prefix n x = 
+    `[(start_with n x (fun=>\bot):oT)%O, (start_with n x (fun=>\top))%O].
+Proof.
+rewrite eqEsubset; split=> z; first last.
+  rewrite set_itvE /= => xbt; apply: share_prefix_trans.
+    apply: (@start_with_prefix _ _ _ (fun=> \bot)%O).
+  rewrite share_prefixC; apply: (lexi_bigprod_between xbt).
+  apply:share_prefix_trans; last by apply: @start_with_prefix.
+  by rewrite share_prefixC; apply: start_with_prefix.
+move=> pfxz; rewrite set_itvE /= /Order.le /= /big_lexi_ord /= /lexi_bigprod. 
+apply/andP; split.
+  case E : (first_diff _ _ ) => [m|] //; rewrite /start_with /=.
+  case mn : (_ < _)%O => //; last by rewrite le0x.
+  by (suff -> : x m = z m by done); apply: pfxz.
+case E : (first_diff _ _ ) => [m|] //; rewrite /start_with /=.
+case mn : (_ < _)%O => //; last by rewrite lex1.
+by (suff -> : x m = z m by done); apply: pfxz.
+Qed.
+
+Lemma shared_prefix_closed n (x : oT) : @closed oT (share_prefix n x).
+Proof. by rewrite shared_prefix_closed_itv; exact: itv_closed. Qed.
+
+Lemma shared_prefix_open n (x : oT) : 
+  @open oT (share_prefix n x).
+Proof. 
+elim: n x.
+  move=> x; suff -> : (share_prefix 0 x) = setT by exact: openT.
+  by rewrite -subTset.
+move=> n IH x.
+suff -> : share_prefix n.+1 x = share_prefix n x `&` 
+  \big[setI/setT]_(t <- enum (K n) | t != x n) (~` (share_prefix n.+1 (dfwith x n t))).
+  apply: openI => //.
+  apply: big_ind; [exact: openT | move=> ? ? ? ?; exact: openI |].
+  move=> ? ?; apply: closed_openC; apply: shared_prefix_closed.
+rewrite eqEsubset; split=> z.
+  move=> zpfx; split; first by apply: (share_prefixS _ zpfx).
+  rewrite -bigcap_seq_cond => w /= /andP [_]; apply: contra_neq_not.
+  move/(_ n (ltnSn _)); rewrite dfwithin => ->; apply/sym_equal/ zpfx.
+  exact: ltnSn.
+case => /= pfzn; rewrite -bigcap_seq_cond => knz r.
+rewrite /Order.lt /= ltnS leq_eqVlt => /orP []; last exact: pfzn.
+move/eqP ->; move: knz; rewrite -setC_bigcup.
+apply: contra_notP => xNz; exists (z n) => //=.
+  apply/andP; split => //=; first exact: mem_enum.
+  by move: xNz; apply: contra_not_neq => ->.
+move=> w; rewrite /Order.lt /= ltnS leq_eqVlt => /orP []. 
+  by move/eqP ->; rewrite dfwithin.
+by move=> /[dup] wz /pfzn <-; rewrite dfwithout // neq_lt /Order.lt /= wz orbT.
+Qed.
+ 
+Section prod_order.
+Context {d} {K : nat -> orderTopologicalType d}.
+Hypothesis dscN : (forall n, discrete_space (K n)).
+
+Let oT := order_topology (big_lexi_order (forall n, K n)).
+Let pT := prod_topology K.
+
+Lemma order_sub_prod (U : set (forall n, K n)) x : 
+  nbhs (x : oT) U -> nbhs (x : pT) U.
+Proof.
+have ? : Filter (@nbhs _ pT x) by exact: nbhs_filter.
+rewrite itv_nbhsE /=; case => i [roi xi] /filterS; apply. 
+have [n npfx] := big_lexi_interval_prefix roi xi.
+have := @tree_prefix K x n dscN; apply: filter_app. 
+by near=> b => pfx; apply: npfx => ? ?; apply/sym_equal; apply: pfx.
+Unshelve. all: end_near. Qed.
+
+Lemma order_prod_open (U : set (forall n, K n)) : 
+  @open oT U -> @open pT U.
+Proof.
+by rewrite ?openE/interior => + x Ux => /(_ x Ux); apply: order_sub_prod.
+Qed.
+
+Lemma ord_prefix_nbhs (x : oT) n : nbhs (x : oT) (share_prefix n x).
+Proof. 
+elim: n.
+  suff -> : share_prefix 0 x = setT by exact: filterT.
+  by rewrite -subTset => ? ?; apply share_prefix0.
+move=> i IH.
+have : open [set x i.+1] by apply: discrete_open; apply: dscN.
+rewrite openE /interior /= => /= /(_ (x i.+1) erefl).
+rewrite (@itv_nbhsE _ (K i.+1)) /=; case=> [][][[]l|[]] [[]r|[]] [][][];
+  rewrite ?in_itv /= ?andbT => xI; first last.
+- move=> xU; move/filterS: IH; apply.
+  move=> w /= pfx m; rewrite /Order.lt /= ltnS leq_eqVlt => /orP [].
+    move/eqP ->; move/eqP.
+- have lNxi : x i.+1 != l by rewrite neq_lt; case/andP:xI => ->; rewrite orbT.
+  have xiNr : x i.+1 != r by rewrite neq_lt; case/andP:xI => + ->.
+  have xdfl := iffLR (@first_diff_dfwith K x i.+1 l) lNxi.  
+  have xdfr := iffLR (@first_diff_dfwith K x i.+1 r) xiNr.  
+  move=> lrxSi.
+  rewrite itv_nbhsE /=; exists (`] @dfwith _ K x i.+1 l, @dfwith _ K x i.+1 r[)%O. 
+    split; first by right.
+    rewrite in_itv /=; apply/andP; rewrite /Order.lt /=.
+    have : ~x = dfwith x i.+1 l by move/first_diff_NoneP; rewrite xdfl.
+    move/eqP -> => /=.
+    have : ~x = dfwith x i.+1 r by move/first_diff_NoneP; rewrite xdfr.
+    move/eqP; rewrite eq_sym => -> /=.
+    rewrite /big_lexi_ord /lexi_bigprod first_diffC xdfl xdfr.
+    by rewrite ?dfwithin; split; apply: ltW; case/andP: xI.
+  move=> z /=; rewrite in_itv /= => xzI.
+  have/first_diff_SomeP[pfxL _] := iffLR (@first_diff_dfwith _ x i.+1 l) lNxi.
+  have/first_diff_SomeP[pfxR _] := iffLR (@first_diff_dfwith _ x i.+1 r) xiNr.
+  apply: (share_prefix_trans pfxL); rewrite share_prefixC.
+  apply: lexi_bigprod_between; first last.
+    by apply: (share_prefix_trans _ pfxR); rewrite share_prefixC.
+  by apply/andP; split; apply: ltW; case/andP: xzI.
+- have lNxi : x i.+1 != l by rewrite neq_lt; move:xI => ->; rewrite orbT.
+  have xdfl : ((@dfwith _ K x i.+1 l : oT) < x)%O.
+    rewrite /Order.lt/=; apply/andP; split.
+      by apply/negP => /eqP; move: xI => /[swap] ->; rewrite dfwithin ltexx.
+    rewrite /big_lexi_ord/lexi_bigprod. 
+    have := iffLR (@first_diff_dfwith _ x i.+1 l) lNxi.
+    by rewrite first_diffC => ->; rewrite dfwithin; apply: ltW.
+  move: IH; rewrite itv_nbhsE /=; case=> [][][[]l'|[]] [[]r'|[]] [][][]; first last.
+  + move=> _.
+
+   case => l' r [olr xlr] lrPfx lix.
+  case: r olr xlr lrPfx; first last.
+    move=>? /itv_open_ends_rinfty -> => xl' l'pfx.
+    exists (`](@dfwith _ K x i.+1 l),+oo[)%O.
+      by (split; first by left); rewrite in_itv /= andbT.
+    move=> r dfr m; rewrite /Order.lt /= ltnS => mi.
+    rewrite leq_eqVlt => /orP [/eqP -> |]. 
+    apply: l'pfx; move: dfr; rewrite set_itvE /=.
+    
+
+
+
+
+
+    exists (Interval (BRight (@dfwith _ K x i.+1 l)) (@dfwith _ K r i.+1 (x i.+1)))%O; first split.
+      move: xlr lrPfx olr => _ _; case: r.
+        by move=> ? ? /itv_open_ends_rside ->; right.
+      by move=> ? /itv_open_ends_rinfty -> ; left.
+    move: xlr; rewrite ?in_itv /= => /andP [_] ->; rewrite andbT.
+    rewrite /Order.lt/=; apply/andP; split.
+      by apply/negP => /eqP; move: xI => /[swap] ->; rewrite dfwithin ltexx.
+    rewrite /big_lexi_ord/lexi_bigprod. 
+    have := iffLR (@first_diff_dfwith _ x i.+1 l) lNxi.
+    by rewrite first_diffC => ->; rewrite dfwithin; apply: ltW.
+  move=> z zlr m; rewrite /Order.lt/= ltnS leq_eqVlt.
+
+Lemma prod_sub_order (U : set (forall n, K n)) x : 
+    nbhs (x : pT) U -> nbhs (x : oT) U.
+Proof. 
+suff : forall F, Filter F -> (F --> (x : oT)) -> {ptws, F --> x} by exact.
+move=> F FF FcvgOrd; apply/cvg_sup => i V; rewrite nbhs_simpl /=.
+case=> ? [/= [W] ? ]; rewrite (_ : @^~ i @^-1` W = (proj i) @^-1`W) // => <- /=.
+rewrite {1}/proj => Wxi /filterS; apply; apply: FcvgOrd.
+have : open [set x i.+1] by apply: discrete_open; apply: dscN.
+rewrite openE /interior /= => /= /(_ (x i.+1) erefl).
+  
+  
+rewrite itv_nbhsE /=; case : (pselect (exists (l : K i), (l < x i)%O));
+  case : (pselect (exists (r : K i), (x i < r)%O)).
+- case=> r xir [l lxi]. 
+  exists ; first last.
+    move=> z /=; rewrite in_itv /=.
+    
+case : pselect .
+  
+
+
+Lemma projO_cts n : continuous (projO n).
+Proof.
+move: n; suff : forall n m, m < n -> continuous (projO m).
+  by move=> + n => /(_ n.+1); apply.
+elim => //= n IH m /ltnSE; rewrite leq_eqVlt => /orP []; last by exact: IH.
+move/eqP -> => x U; rewrite itv_nbhsE /=; case=> [][][[]l|[]] [[]r|[]] [][][]. 
+rewrite /projO /=.
+
+Search discrete_space
+
+
+Lemma proj_seperates_points_from_closed : separate_points_from_closed projO.
+Proof.
+move=> /= U x /closed_openC; rewrite openE /interior => /[apply].
+rewrite itv_nbhsE /=; case=> i [oI] xi.
+suff : exists n, forall y, y n = x n -> y \in i.
+  case=> n yNE; exists n.
+  rewrite -{1}(iffLR (@closure_id _ [set _ | _ in _])); first last.
+    by apply: discrete_closed; exact/dscN.
+  rewrite /projO /=; apply/forall2NP => z; rewrite orNp => Uz.
+  by move/yNE => zi; have := q _ zi; apply.
+case: i oI xi => [][[]l|[]] [[]r|[]] [][]. 
+- case E : (first_diff l r) => [n|]; rewrite in_itv /=; first last.
+    by move/first_diff_eqP:E ->; rewrite /= lt_asym.
+  move: n E
+
+    Search (`]?x,?x[)%R.
+  
+move: xi;  apply: contraPP.
+case/forallNP/(_ 0)/existsNP=> y /not_implyP [].
+- move=> xlr.
+
+have /= : forall n, [set projO n x | x in U] (projO n x).
+  move=> n; have /contrapT := Un n.
+    by apply: discrete_closed; exact/dscN.
+  by case => r Ur /= <-; exists r.
+rewrite /projO => Un'.
+
+U `&` (proj n)@^-1{[set x n]}
+
+
+
+Lemma prod_topology_big_lexi_order (x : prod_topology K) :
+  nbhs x = filter_from 
+    (fun i : interval (big_lexi_order (forall n, K n)) => itv_open_ends i /\ x \in i)
+    (fun i => [set` i]).
+Proof.
+rewrite eqEsubset; split=> U /=.
+  Search prod_topology.
+Admitted.
+
+HB.instance Definition _ := Order_isNbhs.Build d (prod_topology K) 
+  prod_topology_big_lexi_order.
+End prod_order.
+
+HB.about prod_topology.
+
+Lemma cantor_order_topology : 
+
+Definition preserve_order {X : Type} (K
+  (f : forall n, set X -> K n -> set X)
+  (g : prod_topology K -> X)
+  (RT : forall n, K n -> K n -> bool) 
+  (RX : X -> X -> bool) 
+  (invar : set X -> Prop)
+  :=
+  (forall n U k1 k2, invar U -> k1 != k2 -> RT n k1 k2 -> lift_rel RX (f n U k1) (f n U k2)) ->
+  (forall t1 t2, lexi_bigprod RT t1 t2 -> RX (g t1) (g t2)).
 
 
 (**md**************************************************************************)
@@ -185,17 +778,6 @@ have /(_ IH) := projT2 (cid (zcov' n (branch_apx g' n))).
 by case: n {IH} => // n; rewrite apxg.
 Qed.
 
-Let tree_prefix (b : T) (n : nat) :
-  \forall c \near b, forall i,  (i < n)%N -> b i = c i.
-Proof.
-elim: n => [|n IH]; first by near=> z => ?; rewrite ltn0.
-near=> z => i; rewrite leq_eqVlt => /predU1P[|iSn]; last by rewrite (near IH z).
-move=> [->]; near: z; exists (proj n @^-1` [set b n]).
-split => //; suff : @open T (proj n @^-1` [set b n]) by [].
-apply: open_comp; [move=> + _; exact: proj_continuous| apply: discrete_open].
-exact: discreteK.
-Unshelve. all: end_near. Qed.
-
 Let apx_prefix b c n :
   (forall i, (i < n)%N -> b i = c i) -> branch_apx b n = branch_apx c n.
 Proof.
@@ -235,6 +817,35 @@ suff : forall n, branch_apx x n = branch_apx y n.
 elim => // m /= brE.
 rewrite (@triv m (branch_apx x m) (x m) (y m) I I) 1?brE//.
 by rewrite -[in X in X `&` _]brE; exact: tree_map_setI.
+Qed.
+
+Local Lemma tree_map_mono RT RX : reflexive RX -> (forall n, reflexive (RT n)) ->
+  @preserve_order K X refine_apx tree_map RT RX tree_invariant.
+Proof.
+move=> RXrefl RTrefl refine_ord t1 t2. 
+rewrite /lexi_bigprod/first_diff.
+case: xgetP => /=; first last.
+  move=> fnE; suff -> : t1 = t2 by rewrite RXrefl.
+  apply: functional_extensionality_dep.
+  suff : forall n, forall x, x < n -> t1 x = t2 x.
+    by move=> + n => /(_ n.+1)/(_ n); apply.
+  elim; first by move=> ?.
+  move=> n IH x; rewrite leq_eqVlt => /orP [/eqP/succn_inj ->|].
+    have /forall2NP/(_ n) [] := fnE (Some n) => // /not_andP.
+    case; last by move /negP; rewrite negbK => /eqP. 
+    by case/existsNP => m /not_implyP [//] mx; apply: absurd; apply/eqP/IH.
+  by move=> xn; apply: IH.
+case => //; last by move=> + [//].
+move=> n _ [? [+ +]] /Some_inj En; rewrite {}En => nmin t1nt2 t1Rt2.
+apply: (@refine_ord n (branch_apx t1 n) (t1 n) (t2 n)) => //.
+  exact: @tree_map_apx t1 n.+1.
+suff -> : branch_apx t1 n = branch_apx t2 n.
+  exact: @tree_map_apx t2 n.+1.
+move: nmin {t1nt2} t1Rt2; elim: n => // n IH mn1 /= ?.
+rewrite IH; first by congr (_ _ _); apply/eqP; apply: mn1.
+  by move => m /ltnW/mn1.
+suff -> : t1 n = t2 n by exact: RTrefl.
+by apply/eqP; apply: mn1.
 Qed.
 
 Lemma tree_map_props : exists f : T -> X,
