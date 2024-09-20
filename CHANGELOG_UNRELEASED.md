@@ -94,6 +94,18 @@
     `order_hausdorff`, `clopen_bigcup_clopen`, `zero_dimensional_ray`,
     `order_nbhs_itv`, `open_order_weak`, and `real_order_nbhsE`.
 
+- in file `classical_orders.v`,
+  + new definitions `share_prefix`, `first_diff`, `lexi_bigprod`, `start_with`,
+    `big_lexi_order`, and `big_lexi_ord`.
+  + new lemmas `share_prefix0`, `share_prefixC`, `share_prefixS`,
+    `share_prefix_refl`, `share_prefix_trans`, `first_diffC`,
+    `first_diff_unique`, `first_diff_SomeP`, `first_diff_NoneP`,
+    `first_diff_lt`, `first_diff_eq`, `first_diff_dfwith`,
+    `lexi_bigprod_reflexive`, `lexi_bigprod_anti`, `lexi_bigprod_trans`,
+    `lexi_bigprod_total`, `start_with_prefix`, `lexi_bigprod_prefix_lt`,
+    `lexi_bigprod_prefix_gt`, `lexi_bigprod_between`,
+    `big_lexi_interval_prefix`, and `shared_prefix_closed_itv`.
+
 ### Changed
 - in `topology.v`:
   + removed the pointed assumptions from `FilteredType`, `Nbhs`, 
