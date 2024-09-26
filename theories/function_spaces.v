@@ -88,6 +88,8 @@ Reserved Notation "{ 'compact-open' , U -> V }"
   (at level 0, U at level 69, format "{ 'compact-open' ,  U  ->  V }").
 Reserved Notation "{ 'compact-open' , F --> f }"
   (at level 0, F at level 69, format "{ 'compact-open' ,  F  -->  f }").
+Reserved Notation "'C' [ X , Y ]"
+  (at level 0, X at level 69, Y at level 69, format "'C' [ X , Y ]").
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -98,6 +100,20 @@ Obligation Tactic := idtac.
 Import Order.TTheory GRing.Theory Num.Theory.
 Local Open Scope classical_set_scope.
 Local Open Scope ring_scope.
+
+HB.mixin Record isContinuous {X Y : topologicalType} (f : X -> Y):= {
+  cts_fun : continuous f
+}.
+
+#[short(type = "continuousType")]
+HB.structure Definition Continuous {X Y : topologicalType} := {
+  f of @isContinuous X Y f 
+}.
+
+Notation "'C' [ X , Y ]" := (@continuousType (X)%type (Y)%type).
+
+HB.instance Definition _ {X Y : topologicalType} := gen_eqMixin (C[X,Y]).
+HB.instance Definition _ {X Y : topologicalType} := gen_choiceMixin (C[X,Y]).
 
 (** Product topology, also known as the topology of pointwise convergence *)
 Section Product_Topology.
@@ -138,6 +154,10 @@ HB.instance Definition _ (U : Type) (T : U -> uniformType) :=
 
 HB.instance Definition _ (U : Type) R (T : U -> pseudoMetricType R) :=
   Uniform.copy (forall x : U, T x) (prod_topology T).
+
+HB.instance Definition _ {X Y : topologicalType} := 
+  Topological.copy (C[X,Y]) (@weak_topology C[X,Y] (X -> Y) id).
+
 End ArrowAsProduct.
 
 Section product_spaces.
@@ -528,6 +548,10 @@ HB.instance Definition _ (U : choiceType) (V : uniformType) :=
 HB.instance Definition _ (U : choiceType) (R : numFieldType)
     (V : pseudoMetricType R) :=
   PseudoMetric.copy (U -> V) (arrow_uniform_type U V).
+
+HB.instance Definition _ {X : topologicalType} {Y : uniformType} := 
+  Topological.copy (C[X,Y]) (@weak_topology C[X,Y] (X -> Y) id).
+
 End ArrowAsUniformType.
 
 (** Limit switching *)
@@ -736,11 +760,11 @@ Lemma hausdorrf_close_eq_in (A : set U) (f g : {uniform` A -> V}) :
 Proof.
 move=> hV.
 rewrite propeqE; split; last exact: eq_in_close.
-rewrite entourage_close => C u; rewrite inE => uA; apply: hV.
+rewrite entourage_close => Ce u; rewrite inE => uA; apply: hV.
 rewrite /cluster -nbhs_entourageE /= => X Y [X' eX X'X] [Y' eY Y'Y].
 exists (g u); split; [apply: X'X| apply: Y'Y]; apply/xsectionP; last first.
   exact: entourage_refl.
-apply: (C [set fg | forall y, A y -> X' (fg.1 y, fg.2 y)]) => //=.
+apply: (Ce [set fg | forall y, A y -> X' (fg.1 y, fg.2 y)]) => //=.
 by rewrite uniform_entourage; exists X'.
 Qed.
 
@@ -1028,6 +1052,10 @@ End compact_open_uniform.
 Module ArrowAsCompactOpen.
 HB.instance Definition _ (U : topologicalType) (V : topologicalType) :=
   Topological.copy (U -> V) {compact-open, U -> V}.
+
+HB.instance Definition _ {X Y : topologicalType} := 
+  Topological.copy (C[X,Y]) (@weak_topology C[X,Y] (X -> Y) id).
+
 End ArrowAsCompactOpen.
 
 Definition compactly_in {U : topologicalType} (A : set U) :=
@@ -1504,6 +1532,13 @@ Unshelve. all: by end_near. Qed.
 
 End cartesian_closed.
 
+Lemma curryK {X Y Z : Type} : cancel (@curry X Y Z) uncurry.
+Proof. by move=> ?; apply/funext; case => ? ? /=. Qed.
+
+Lemma uncurryK {X Y Z : Type} : cancel uncurry (@curry X Y Z).
+Proof. by move=> ?; rewrite funeq2E => ? ?. Qed.
+
+
 Section curry_set_fun.
 Context {U V W : topologicalType} (A : set U) (B : set V) (C : set W).
 
@@ -1523,45 +1558,10 @@ End curry_set_fun.
 
 End currying.
 
-HB.mixin Record isContinuous {X Y : topologicalType} (A : set X) (B : set Y) f 
-    & isFun X Y A B f := {
-  cts_fun : {within A, continuous f}
-}.
-
-#[short(type = "continuousFun")]
-HB.structure Definition ContinuousFun {X Y : topologicalType} (A : set X) (B : set Y) := {
-  f of @isContinuous X Y A B f & @isFun X Y A B f
-}.
-
-Notation "'C' [ A , B ]" := (@continuousFun _ _ A B ).
-
-Section continuous_comp.
-Context {X Y Z : topologicalType} (A : set X) (B : set Y) (C : set Z).
-Local Lemma cts_fun_comp (f : C[A,B]) (g : C[B,C]) : {within A, continuous (g \o f)}.
-Proof.
-move=> x; apply: (@continuous_comp (subspace A) (subspace _) _ f g).
-  exact/subspaceT_continuous/cts_fun.
-exact: cts_fun.
-Qed.
-
-HB.instance Definition _ (f : C[A,B]) (g : C[B,C]) := 
-  @isContinuous.Build X Z A C (g \o f) (@cts_fun_comp f g).
-
-End continuous_comp.
-Section continuous_id.
-Context {X : topologicalType} (A : set X).
-
-Local Lemma cts_id : {within A, continuous (@idfun X)}.
-Proof. by apply: continuous_subspaceT; move=> ?; apply: cvg_id. Qed.
-
-HB.instance Definition _ := @isContinuous.Build X X A A (@idfun X) cts_id.
-
-End continuous_id.
-
 Section subspace_product.
 Context {X Y Z : topologicalType} (A : set X) (B : set Y) .
 
-Lemma nbhs_prodM_subspace_inE x : 
+Lemma nbhs_prodX_subspace_inE x : 
   (A `*` B) x ->
   @nbhs _ (subspace (A `*` B)) x =  @nbhs _ ((subspace A) * (subspace B))%type x.
 Proof.
@@ -1584,20 +1584,27 @@ Lemma continuous_subspace_prodP (f : X * Y -> Z) :
   {within A `*` B, continuous f}.
 Proof.
 by split; rewrite continuous_subspace_in => + x ABx U nfxU => /(_ x ABx U nfxU);
-  rewrite nbhs_prodM_subspace_inE //; move/set_mem:ABx.
+  rewrite nbhs_prodX_subspace_inE //; move/set_mem:ABx.
 Qed.
 End subspace_product.
 
 HB.instance Definition _ {X : topologicalType} (A : set X) := 
   Topological.copy (A : Type) (@weak_topology (A:Type) X set_val ).
 
-Lemma continuous_subspaceT {X Y : topologicalType} (f : X -> Y) : 
+HB.instance Definition _ {X : uniformType} (A : set X) := 
+  Uniform.copy (A : Type) (@weak_topology (A:Type) X set_val ).
+
+HB.instance Definition _ 
+  {R : realType} {X : pseudoMetricType R} (A : set X) : @PseudoMetric R A := 
+  PseudoMetric.copy (A : Type) (@weak_topology (A:Type) X set_val ).
+
+Lemma continuous_subspace_setT {X Y : topologicalType} (f : X -> Y) : 
   continuous f <-> {within setT, continuous f}.
 Proof. split; by move=> + x U nfU=> /(_ x U nfU); rewrite nbhs_subspaceT. Qed.
 
 Section subspace_sig.
 Context {X : topologicalType} (A : set X).
-Lemma subspace_sigP (x : A) (U : set A) : 
+Lemma subspace_subtypeP (x : A) (U : set A) : 
   nbhs x U <-> nbhs (set_val x : subspace A) (set_val @` U).
 Proof.
 rewrite /nbhs /= -nbhs_subspace_in //; first last.
@@ -1613,12 +1620,12 @@ move=> w /= /V'V Vsw; have : (V `&` A) (\val w).
 by rewrite -UAVA /=; case; case=> v ? /eq_sig_hprop <-.
 Qed.
 
-Lemma subspace_sig_continuousP {Y : topologicalType} (f : X -> Y) : 
-  {within A, continuous f} <-> continuous (f \o set_val : A -> Y).
+Lemma subspace_sigL_continuousP {Y : topologicalType} (f : X -> Y) : 
+  {within A, continuous f} <-> continuous (sigL A f).
 Proof.
 split.
   have/continuous_subspaceT/subspaceT_continuous:= @weak_continuous A X set_val.
-  move=> svf ctsf; apply/continuous_subspaceT => x.
+  move=> svf ctsf; apply/continuous_subspace_setT => x.
   apply (@continuous_comp (subspace _) (subspace A)); last by exact: ctsf.
   by move=> U nfU; exact: svf. 
 rewrite continuous_subspace_in => + x Ax U nfxU.
@@ -1629,58 +1636,156 @@ rewrite openE /= /interior=> /(_ _ Wx); rewrite {1}set_valE/=.
 apply:filter_app; apply: nearW => w Ww /= /mem_set Aw. 
 by have /= := svWU (@exist _ _ w Aw); rewrite ?set_valE /=; apply.
 Qed.
+
+Lemma subspace_valL_continuousP' {Y : topologicalType} (y : Y) (f : A -> Y) : 
+  {within A, continuous (valL_ y f)} <-> continuous f.
+Proof.
+rewrite -{2}[f](@valLK _ _ y A); split.
+  by move/subspace_sigL_continuousP.
+by move=> ?; apply/subspace_sigL_continuousP.
+Qed.
+
+
+Lemma subspace_valL_continuousP {Y : ptopologicalType} (f : A -> Y) : 
+  {within A, continuous (valL f)} <-> continuous f.
+Proof. exact: (@subspace_valL_continuousP' _ point). Qed.
+
 End subspace_sig.
 
-Section assign_cpt_open.
-Context {X Y : topologicalType} (A : set X) (B : set Y).  
-HB.instance Definition _ := gen_eqMixin (C[A,B]).
-HB.instance Definition _ := gen_choiceMixin (C[A,B]).
+Section subtype_prod.
+Context {X Y : topologicalType} (A : set X) (B : set Y).
+Program Definition sub_prod (ab : A `*` B) : (A * B)%type := 
+  (@exist _ _ ab.1 _, @exist _ _ ab.2 _).
+Next Obligation. by case; case => a b /= /set_mem [] ? ?; apply/mem_set. Qed.
+Next Obligation. by case; case => a b /= /set_mem [] ? ?; apply/mem_set. Qed.
+  
+Program Definition prod_sub (ab : (A * B)%type) : (A `*` B) :=
+  (@exist _ _ (\val ab.1, \val ab.2) _).
+Next Obligation.
+  by case; case=> x /= /set_mem ? [y /= /set_mem ?]; apply/mem_set.
+Qed.
 
-HB.instance Definition _ := 
-  Topological.copy (C[A,B]) (@weak_topology C[A,B] {compact-open, X -> Y} id).
-End assign_cpt_open.
+Lemma sub_prodK : cancel prod_sub sub_prod.
+Proof.
+by case; case=> x ? [y ?]; congr (( _, _)); apply: eq_sig_hprop.
+Qed.
+
+Lemma prod_subK : cancel sub_prod prod_sub.
+Proof. by case; case => a b ?; apply: eq_sig_hprop. Qed.
+
+Lemma sub_prod_continuous : continuous sub_prod.
+Proof.
+case;case => /= x y p U [/= [P Q]] /= [nxP nyQ] pqU.
+case: nxP => ? [/= [] P' oP' <- /=]; rewrite ?set_valE /= => P'x P'P.
+case: nyQ => ? [/= [] Q' oQ' <- /=]; rewrite ?set_valE /= => Q'x Q'Q.
+pose PQ : set (A `*` B) := \val@^-1` (P' `*` Q'). 
+exists PQ; split => //=.
+  exists (P' `*` Q') => //. 
+  rewrite openE;case => a b /= [] ? ?; exists (P', Q') => //; split.
+    by move: oP'; rewrite openE; exact.
+  by move: oQ'; rewrite openE; exact.
+case; case => a b /= abAB [/= P'a Q'b]; apply: pqU. 
+rewrite /sub_prod; split => //=; [ exact: P'P | exact: Q'Q].
+Qed.
+
+Lemma prod_sub_continuous : continuous prod_sub.
+Proof.
+case; case => x /= Ax [y By] U [? [] [W + <-] /=]; rewrite set_valE /=.
+rewrite openE /= => /[apply] [][][] P Q /=; rewrite {1}nbhsE. 
+rewrite {1}nbhsE /= => [][][P' [oP' P'x P'P]] [Q' [oQ' Q'y Q'Q]] PQW WU.
+exists (val@^-1` P', \val@^-1` Q') => //=.
+  split => //=; first by (exists (\val@^-1` P'); first by split => //=; exists P').
+  by exists (\val@^-1` Q'); first by split => //=; exists Q'.
+case; case=> p Ap [q Bq] /= [P'p Q'q]; apply: WU; apply: PQW; split.
+  exact: P'P.
+exact: Q'Q.
+Qed.
+
+End subtype_prod.
+
+Section continuous_subspace_subtype.
+
+Section continuous_comp.
+Context {X Y Z : topologicalType}.
+Local Lemma cts_fun_comp (f : C[X,Y]) (g : C[Y,Z]) : continuous (g \o f).
+Proof. move=> x; apply: continuous_comp; exact: cts_fun. Qed.
+
+HB.instance Definition _ (f : C[X,Y]) (g : C[Y,Z]) := 
+  @isContinuous.Build X Z (g \o f) (@cts_fun_comp f g).
+
+End continuous_comp.
+Section continuous_id.
+Context {X : topologicalType}.
+
+Local Lemma cts_id : continuous (@idfun X).
+Proof. by move=> ?. Qed.
+
+HB.instance Definition _ := @isContinuous.Build X X (@idfun X) cts_id.
+
+End continuous_id.
 
 HB.instance Definition _ {X : topologicalType} (A : set X) := 
   Topological.copy (set_type A) (weak_topology set_val).
 
-Section curry_fun.
-Context {X Y Z : topologicalType} (A : set X) (B : set Y) (C : set Z).  
-Hypothesis regX : (@regular_space X).
+Section compact_open_cts.
 Local Import ArrowAsCompactOpen.
+Section curry_cts.
+Context {X Y Z : topologicalType}.
 
-Lemma foo (f : C[A `*` B, C]) a : A a -> {within B, continuous (curry f a)}.
+Local Lemma curry_cts_x (f : C[(X * Y)%type, Z]) : forall x, continuous (curry f x).
+Proof. by have [] := continuous_curry (@cts_fun _ _ f). Qed.
+
+HB.instance Definition _ (f : C[(X * Y)%type, Z]) (x : X) := 
+  @isContinuous.Build Y Z _ (@curry_cts_x f x).
+
+Let curry1 (f : C[X * Y, Z]) (x : X) := 
+  [the continuousType Y Z of curry f x].
+
+Local Lemma curry1_cts (f : C[(X * Y)%type, Z]) : continuous (curry1 f).
+Proof. 
+apply/continuousP => /= ? [/= U oU <-]. 
+have -> : curry1 f = curry f by exact/funext.
+rewrite comp_preimage /= preimage_id /=.
+by have [/continuousP/(_ U oU) + _] := continuous_curry (@cts_fun _ _ f). 
+Qed.
+
+HB.instance Definition _ (f : C[X * Y, Z]) := 
+  @isContinuous.Build _ _ _ (@curry1_cts f).
+
+Definition ccurry (f : C[X*Y,Z]) : C[X,C[Y,Z]] := [the continuousType _ _ of (curry1 f)].
+
+End curry_cts.
+
+Lemma continuousEP {X Y : topologicalType} (f g : C[X,Y]) :
+  f = g <-> f =1 g.
 Proof.
-move=> Aa.
-have := @continuous_curry A B Z (f \o (fun ab => (set_val ab.1, set_val ab.2))).
-case. 
-  case=> p q; apply: continuous_comp. 
-    apply: cvg_pair => /=.
-  Search pair cvg_to.
-    apply: continuous2
-    apply: continuous2_cvg => //=. 
-      apply: continuous2_cvg.
-    apply: .
-    simpl. 
-      apply cts_fun.
-  suff : (continuous (f : ((subspace A) * (subspace B))%type -> Z)) by done.
-  suff subProd :
-     {within A `*` B, continuous f} -> (continuous (f : ((subspace A) * (subspace B))%type -> Z)).
-  by apply: subProd; apply: cts_fun.
-  
-move=> a /=; case (pselect (A a)); last by admit.
-move=> ?; apply: (@continuous_subspaceT_for (subspace A) (Y -> Z) A (curry f)) => //.
-apply continuous_uncurry.
-apply.
-have := (@ (weak_topology A) Y Z f _ regX).
+case: f g => [f [[ffun]]] [g [[gfun]]]/=; split=> [[->//]|/funext eqfg].
+rewrite eqfg in ffun *; congr {| Continuous.sort := _; Continuous.class := {|
+  Continuous.function_spaces_isContinuous_mixin := {|isContinuous.cts_fun := _|}|}|}.
+exact: Prop_irrelevance.
+Qed.
 
+Section eval_cts.
 
-curry f : C[A, [set: C[B,C]]]
+Context {X Y : topologicalType}.
+Hypothesis regX : @regular_space X.
+Hypothesis lcpX : locally_compact [set: X].
 
-Local Lemma curry_cts_fun : 
-  set_fun [set: C[(A `*` B), C]] [set: C[A, [set: C[B,C]]]] .
-     .
+Local Lemma continuous_eval : continuous (uncurry (@idfun (C[X,Y]))).
 Proof.
+apply: continuous_uncurry_regular => //; first exact: weak_continuous.
+by move=> ?; exact: cts_fun.
+Qed.
+
+HB.instance Definition _ := 
+  @isContinuous.Build _ _ _ (continuous_eval).
+
+Definition eval : C[C[X,Y] * X, Y] := uncurry (@idfun (C[X,Y])).
+
+Lemma ccurry_evalE : ccurry eval = (@idfun (C[X,Y])).
+Proof. apply/continuousEP => ?; rewrite /= /eval /=. 
+Check Q.
+Lemma eval_uncurryE : ccurry eval = . 
+Proof. exact/funext. Qed.
 
 
-
-End Foo.
