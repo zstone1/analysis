@@ -1703,8 +1703,6 @@ Qed.
 
 End subtype_prod.
 
-Section continuous_subspace_subtype.
-
 Section continuous_comp.
 Context {X Y Z : topologicalType}.
 Local Lemma cts_fun_comp (f : C[X,Y]) (g : C[Y,Z]) : continuous (g \o f).
@@ -1790,13 +1788,16 @@ Proof. exact/continuousEP. Qed.
 
 End eval_cts.
 
-Section compact_reg.
+Section compact_normal.
 Context {X : topologicalType}.
 
-Lemma compact_normal : hausdorff_space X -> compact [set: X] -> normal_space X.
+Lemma compact_local_normal (K : set X) : hausdorff_space X -> compact K -> 
+  forall A : set X, closed A -> A `<=` interior K ->
+    filter_from (set_nbhs A) closure `=>` set_nbhs A.
 Proof.
-move=> hsdfX cptX A clA B; have /compact_near_coveringP cvA : compact A. 
-  exact: (subclosed_compact _ cptX).
+move=> hsdfX cptV A clA AK B; have /compact_near_coveringP cvA : compact A. 
+  apply: (subclosed_compact _ cptV) => //.
+  by apply: subset_trans; last exact: interior_subset.
 have snbC : forall (U : set X), Filter (filter_from (set_nbhs U) closure).
   move=> U; apply: filter_from_filter; first by exists setT; apply: filterT.
   move=> P Q  sAP sAQ; exists (P `&` Q); last exact: closureI.
@@ -1811,7 +1812,7 @@ pose F := powerset_filter_from (filter_from (set_nbhs (~` B)) closure).
 have PF : Filter F by exact: powerset_filter_from_filter.
 have cvP : (forall x, A x -> \forall x' \near x & i \near F, (~` i) x').
   move=> x Ax; near_simpl; case/set_nbhsP: snAB => C [oC AC CB].
-  have [] := @compact_regular _ hsdfX x _ cptX (@filterT _ _ (nbhs_filter x)) C.
+  have [] := @compact_regular _ hsdfX x _ cptV _ C; first exact: AK.
     by rewrite nbhsE /=; exists C => //; split => //; apply: AC.
   move=> D /nbhs_interior nD cDC. 
   have snBD : filter_from (set_nbhs (~` B)) closure (closure (~` (closure D))).
@@ -1836,6 +1837,122 @@ have : closed (~` W) by exact: open_closedC.
 by rewrite closure_id => <-; apply: subsetCl.
 Unshelve. all: by end_near. Qed.
 
-  
+Lemma compact_normal (K : set X) : hausdorff_space X -> compact [set: X] -> normal_space X.
+Proof.
+move=> ? /compact_local_normal + A clA; apply => //.
+by move=> z ?; exact: filterT.
+Qed.
 
-Search compact hausdorff_space.
+Definition one_point_compactification : Type := option X.
+
+Local Notation opc := (one_point_compactification).
+
+HB.instance Definition _ := Choice.on opc.
+HB.instance Definition _ := Pointed.on opc.
+
+Definition one_point_nbhs (x : opc) : set_system opc := 
+  match x with 
+  | Some x' => Some @ nbhs x'
+  | None => filter_from (compact `&` closed) (fun U => (Some @` ~`U) `|` [set None])
+  end.
+
+Lemma one_point_filter (x : opc) : ProperFilter (one_point_nbhs x).
+Proof.
+case: x; first by move=>?; exact: fmap_proper_filter. 
+apply: filter_from_proper; last by move=> ? _; exists None; right.
+apply: filter_from_filter.
+  by exists set0; split; [exact: compact0 | exact: closed0].
+move=> P Q [? ?] [? ?]; exists (P `|` Q); last case.
+- by split; [exact: compactU | exact: closedU].
+- by move=> ? []// [a /not_orP [? ?]] /Some_inj <-; split=>//; left; exists a.
+- by case => //= _; split; right.
+Qed.
+
+Lemma one_point_singleton (x : opc) U : one_point_nbhs x U -> U x.
+Proof.
+case: x; first by move=> x' /= /nbhs_singleton.
+by case=> W _; apply; right.
+Qed.
+
+Lemma one_point_nbhs_nbhs (p : opc) (A : set opc) : 
+  one_point_nbhs p A -> one_point_nbhs p (one_point_nbhs^~ A).
+Proof.
+case: p.
+  move=> r /=; rewrite nbhs_simpl nbhsE; case => U [oU Ur] UsA /=.
+  by exists U => //= z /=; rewrite nbhs_simpl => Uz; rewrite nbhsE; exists U.
+case => C [? ?] nCA /=; exists C => //; case; last by move=> _; exists C.
+move=> x [] // [] y /[swap] /Some_inj -> /= nCx; rewrite nbhs_simpl.
+rewrite nbhsE; exists (~` C); first by split => //; apply/closed_openC.
+by move=> z /= nCz; apply nCA; left.
+Qed.
+
+HB.instance Definition _ := hasNbhs.Build opc one_point_nbhs.
+
+HB.instance Definition _ := @Nbhs_isNbhsTopological.Build opc 
+  one_point_filter one_point_singleton one_point_nbhs_nbhs.
+
+Lemma opc_compact : compact [set: opc].
+Proof.
+apply/compact_near_coveringP => ? F /= P FF FT.
+have [//| [U i [[W /= [cptW cW WU nfI UIP]]]]] := FT None.
+have P'F : forall x, W x -> \near x & F, P F (Some x).
+  move=> x Wx; suff : \forall y \near Some @ x & f \near id @ F, P f y.
+    by rewrite near_map2.
+  exact: FT (Some x) I.
+move/compact_near_coveringP/(_ _ F _ FF P'F):cptW => cWP.
+near=> j => z _; case: z; first last.
+  apply: (UIP (None,j)); split => //=; first by apply: WU; right.
+  exact: (near nfI _).
+move=> z; case: (pselect (W z)); first by move=> ?; exact: (near cWP).
+move=> ?; apply: (UIP (Some z,j)); split => //=. 
+  by apply: WU; left; exists z.
+exact: (near nfI _).
+Unshelve. all: by end_near. Qed.
+
+Lemma opc_some_nbhs (x : X) (U : set X) : nbhs x U -> @nbhs _ opc (Some x) (Some @` U).
+Proof.
+rewrite {2}/nbhs /= nbhs_simpl /= => /filterS; apply; exact: preimage_image.
+Qed.
+
+Lemma opc_some_continuous : continuous (Some : X -> opc).
+Proof. by move=> x U. Qed.
+
+Lemma opc_open_some (U : set X) : open U -> @open opc (Some @` U).
+Proof.
+rewrite ?openE /= => Uo ? /= [x /[swap] <- Ux] /=. 
+by apply: opc_some_nbhs; apply: Uo.
+Qed.
+
+Lemma opc_weak_topology (x : X) (U : set X) : 
+  @nbhs _ (@weak_topology X opc Some) x U = @nbhs _ X x U.
+Proof. 
+apply/propeqP; split; rewrite /(@nbhs _ (weak_topology _)) /=.
+  case => V [[/= W] oW <- /= Ws] /filterS; apply; apply: opc_some_continuous.
+  exact: oW.
+rewrite nbhsE; case => V [? ? ?]; exists V; split => //.
+exists (Some @` V); first exact: opc_open_some.
+rewrite eqEsubset; split => z /=; first by case=> ? /[swap] /Some_inj ->.
+by move=> ?; exists z.
+Qed.
+
+Lemma opc_hausdorff : locally_compact [set: X] -> hausdorff_space X -> hausdorff_space opc.
+Proof.
+move=> lcpt hsdfX [x|] [y|] //=.
+- move=> clxy; congr(_ _); apply: hsdfX=> U V Ux Vy.
+  have [] := clxy (Some @` U) (Some @` V).
+    by move/filterS: Ux; apply; apply: preimage_image.
+    by move/filterS: Vy; apply; apply: preimage_image.
+  case=> [?|] [] /= [// p /[swap] /Some_inj <- ?] [q /[swap] /Some_inj -> ?].
+  by exists p.
+- have [U] := lcpt x I; rewrite withinET => Ux [] cU clU.
+  case/(_ (Some @` U) ((Some @` (~` U)) `|` [set None])); first exact: opc_some_nbhs.
+    by exists U.
+  by case => [?|] [][]// z /[swap] /Some_inj <- ? [] //= [? /[swap] /Some_inj ->].
+- have [U] := lcpt y I; rewrite withinET => Uy [] cU clU.
+  case/(_ ((Some @` (~` U)) `|` [set None]) (Some @` U) ); first by exists U.
+    exact: opc_some_nbhs.
+  case => [?|] [][]//= + [] ? // /[swap] /Some_inj ->.
+  by case => ? /[swap] /Some_inj <-.
+Qed.
+
+End compact_normal.
