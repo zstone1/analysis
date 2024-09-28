@@ -1783,9 +1783,59 @@ HB.instance Definition _ :=
 Definition eval : C[C[X,Y] * X, Y] := uncurry (@idfun (C[X,Y])).
 
 Lemma ccurry_evalE : ccurry eval = (@idfun (C[X,Y])).
-Proof. apply/continuousEP => ?; rewrite /= /eval /=. 
-Check Q.
-Lemma eval_uncurryE : ccurry eval = . 
-Proof. exact/funext. Qed.
+Proof. by apply/continuousEP => /= f; exact/continuousEP. Qed.
 
+Lemma eval_uncurryE : eval = uncurry (@idfun (C[X,Y])).
+Proof. exact/continuousEP. Qed.
 
+End eval_cts.
+
+Section compact_reg.
+Context {X : topologicalType}.
+
+Lemma compact_normal : hausdorff_space X -> compact [set: X] -> normal_space X.
+Proof.
+move=> hsdfX cptX A clA B; have /compact_near_coveringP cvA : compact A. 
+  exact: (subclosed_compact _ cptX).
+have snbC : forall (U : set X), Filter (filter_from (set_nbhs U) closure).
+  move=> U; apply: filter_from_filter; first by exists setT; apply: filterT.
+  move=> P Q  sAP sAQ; exists (P `&` Q); last exact: closureI.
+  exact: (@filterI _ _ (@set_nbhs_filter _ U)).
+move=> snAB; case : (pselect (~`B!=set0)); first last.
+  move=> nB0; suff -> : B = setT by exact: (@filterT _ _ (snbC A)).
+  by rewrite -subTset => t _; move: nB0; apply: contra_notP => nBt; exists t.
+case=> b0 B0; have PsnA : ProperFilter (filter_from (set_nbhs (~`B)) closure).
+  apply:filter_from_proper; move=> ? P. 
+  by exists b0; apply/subset_closure; apply: nbhs_singleton; apply: P.
+pose F := powerset_filter_from (filter_from (set_nbhs (~` B)) closure).
+have PF : Filter F by exact: powerset_filter_from_filter.
+have cvP : (forall x, A x -> \forall x' \near x & i \near F, (~` i) x').
+  move=> x Ax; near_simpl; case/set_nbhsP: snAB => C [oC AC CB].
+  have [] := @compact_regular _ hsdfX x _ cptX (@filterT _ _ (nbhs_filter x)) C.
+    by rewrite nbhsE /=; exists C => //; split => //; apply: AC.
+  move=> D /nbhs_interior nD cDC. 
+  have snBD : filter_from (set_nbhs (~` B)) closure (closure (~` (closure D))).
+    exists (closure (~` closure D)) => z.
+      move=> nBZ; apply: filterS; first exact: subset_closure.
+      apply: open_nbhs_nbhs; split => //; first exact/closed_openC/closed_closure.
+      by move=> nCD; apply: nBZ; apply/CB/cDC.
+    by have := (@closed_closure _ (~` closure D)); rewrite closure_id => <-.
+  near=> y U => /=; have Dy : interior D y by exact: (near nD _).
+  have UclD : U `<=` closure (~` closure D).
+    exact: (near (small_set_sub snBD) U).
+  move=> Uy; have [z [/= + Dz]] := UclD _ Uy _ Dy.
+  by apply; apply: subset_closure.
+case/(_ _ _ _ _ cvP): cvA => R /= [RA Rmono [U RU] RBx]. 
+have [V /set_nbhsP [W [oW cBW WV] clVU]] := RA _ RU; exists (~` W).
+  apply/set_nbhsP; exists (~` closure W); split => //.
+    exact/closed_openC/closed_closure.
+  move=> y Ay; have := RBx _ RU y Ay => Uy Wy.
+  by apply: Uy; apply: clVU; apply: (closure_subset WV).
+  apply: subsetC; apply: subset_closure.
+have : closed (~` W) by exact: open_closedC.
+by rewrite closure_id => <-; apply: subsetCl.
+Unshelve. all: by end_near. Qed.
+
+  
+
+Search compact hausdorff_space.
