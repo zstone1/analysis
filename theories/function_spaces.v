@@ -1838,7 +1838,7 @@ have : closed (~` W) by exact: open_closedC.
 by rewrite closure_id => <-; apply: subsetCl.
 Unshelve. all: by end_near. Qed.
 
-Lemma compact_normal (K : set X) : hausdorff_space X -> compact [set: X] -> normal_space X.
+Lemma compact_normal : hausdorff_space X -> compact [set: X] -> normal_space X.
 Proof.
 move=> ? /compact_local_normal + A clA; apply => //.
 by move=> z ?; exact: filterT.
@@ -1924,10 +1924,10 @@ rewrite ?openE /= => Uo ? /= [x /[swap] <- Ux] /=.
 by apply: opc_some_nbhs; apply: Uo.
 Qed.
 
-Lemma opc_weak_topology (x : X) (U : set X) : 
-  @nbhs _ (@weak_topology X opc Some) x U = @nbhs _ X x U.
+Lemma opc_weak_topology : 
+  @nbhs _ (@weak_topology X opc Some) = @nbhs _ X.
 Proof. 
-apply/propeqP; split; rewrite /(@nbhs _ (weak_topology _)) /=.
+rewrite funeq2E=> x U; apply/propeqP; split; rewrite /(@nbhs _ (weak_topology _)) /=.
   case => V [[/= W] oW <- /= Ws] /filterS; apply; apply: opc_some_continuous.
   exact: oW.
 rewrite nbhsE; case => V [? ? ?]; exists V; split => //.

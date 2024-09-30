@@ -3788,6 +3788,14 @@ End normalP.
 
 Section completely_regular.
 
+(* This is equivalent to uniformizable. Note there is a subtle 
+   distinction between being uniformizable and being uniformType.
+   There is often more than one possible uniformity, and being a 
+   uniformType has a specific one.
+
+   If you don't care, you can use the `completely_regular_uniformity.type`
+   which builds the uniformity.
+*)
 Definition completely_regular_space (T : topologicalType) :=
   forall (a : T) (B : set T), closed B -> ~ B a -> uniform_separator [set a] B.
 
@@ -3872,23 +3880,23 @@ Module Exports. HB.reexport. End Exports.
 End completely_regular_uniformity.
 Export completely_regular_uniformity.Exports.
 
+
 Section locally_compact_uniform.
 Context {X : topologicalType} {R : realType}.
 Hypothesis lcpt : locally_compact [set: X].
 Hypothesis hsdf : hausdorff_space X.
 
-Let opc := @one_point_compactification X.
+Let opc  := @one_point_compactification X.
 
 Lemma completely_reg_opc : completely_regular_space opc.
 Proof.
 apply: normal_completely_regular. 
-(* TODO: extra argument somewhere *)
-  apply: compact_normal; first exact: set0.
+  apply: compact_normal.
     exact: opc_hausdorff.
   exact: opc_compact.
 by apply: hausdorff_accessible; exact: opc_hausdorff.
 Qed.
-
+#[local]
 HB.instance Definition _ := Uniform.copy opc 
   (completely_regular_uniformity.type completely_reg_opc).
 
@@ -3911,7 +3919,7 @@ Proof. by rewrite nbhs_entourageE opc_weak_topology2. Qed.
 
 #[local, non_forgetful_inheritance]
 HB.instance Definition _ := @Nbhs_isUniform.Build 
-  X 
+  X
   (@entourage X') 
   (@entourage_filter X')
   (@entourage_diagonal_subproof X')
@@ -3921,9 +3929,8 @@ HB.instance Definition _ := @Nbhs_isUniform.Build
 
 Lemma locally_compact_completely_regular : completely_regular_space X.
 Proof. exact: uniform_completely_regular. Qed.
-End locally_compact_uniform.
 
-Section pseudometric_normal.
+End locally_compact_uniform.
 
 Lemma uniform_regular {X : uniformType} : @regular_space X.
 Proof.
@@ -3932,6 +3939,15 @@ move/(subset_trans (ent_closure entE)) => ExA.
 by exists (xsection (split_ent E) x) => //; exists (split_ent E).
 Qed.
 
+Lemma completely_regular_regular {X : topologicalType} : 
+  completely_regular_space X -> @regular_space X.
+Proof.
+move=> crsX; pose P' := completely_regular_uniformity.type crsX.
+exact: (@uniform_regular P').
+Qed.
+
+Section pseudometric_normal.
+(*
 Lemma regular_openP {T : topologicalType} (x : T) :
   {for x, @regular_space T} <-> forall A, closed A -> ~ A x ->
   exists U V : set T, [/\ open U, open V, U x, A `<=` V & U `&` V = set0].
@@ -6165,3 +6181,5 @@ by have [j [Dj BiBj ij]] := maxD i Vi; move/(_ _ cBix) => ?; exists j.
 Qed.
 
 End vitali_lemma_infinite.
+
+*)
