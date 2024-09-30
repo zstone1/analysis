@@ -2212,7 +2212,7 @@ Lemma filterI_iter_finI {I : choiceType} T D (f : I -> set T) :
 Proof.
 rewrite eqEsubset; split.
   move=> A [N /= + <-]; have /finite_setP[n] := finite_fset N; elim: n N.
-    move=> ?; rewrite II0 card_eq0 => /eqP -> _; rewrite bigcap_set0.
+    move=> ?; rewrite II0 card_eq0 => /eqP -> _; rewrite bigcap_Frset0.
     by exists O => //; left.
   move=> n IH N /eq_cardSP[x Ax + ND]; rewrite -set_fsetD1 => Nxn.
   have NxD : {subset (N `\ x)%fset <= D}.
@@ -2230,7 +2230,7 @@ move=> A [n _]; elim: n A.
 by move=> n IH A /= [B snB [C snC <-]]; apply: finI_fromI; apply: IH.
 Qed.
 
-Lemma smallest_filter_finI {T : choiceType} (D : set T) f :
+Lemma smallest_filter_finI {I T : choiceType} (D : set I) f :
   filter_from (finI_from D f) id = smallest (@Filter T) (f @` D).
 Proof. by rewrite filterI_iter_finI filterI_iterE. Qed.
 

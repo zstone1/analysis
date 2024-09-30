@@ -1787,6 +1787,7 @@ Lemma eval_uncurryE : eval = uncurry (@idfun (C[X,Y])).
 Proof. exact/continuousEP. Qed.
 
 End eval_cts.
+End compact_open_cts.
 
 Section compact_normal.
 Context {X : topologicalType}.
