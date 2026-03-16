@@ -334,6 +334,10 @@
 - in `num_topology.v`:
   + lemma `lt_nbhsl`
 
+- in `subspace_topology.v`:
+  + `continuousFunType` -> `continuousSubspaceType`
+  + `ContinuousFun` -> `ContinuousSubspace`
+
 ### Deprecated
 
 - in `lebesgue_integral_nonneg.v`:
